@@ -5,7 +5,7 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { useTheme } from "../contexts/ThemeContext";
-import { getMessages, sendMessage, markAllMessagesAsRead } from "../apis/chat";
+import { getUserChatRooms, getMessages, sendMessage, markAllMessagesAsRead } from "../apis/chat";
 
 interface ChatRoom {
   id: string;
@@ -53,23 +53,39 @@ export default function Chat() {
   // 채팅방 목록 로드
   useEffect(() => {
     const fetchChatRooms = async () => {
+      if (!currentUserId) {
+        setLoading(false);
+        return;
+      }
+      
       try {
         setLoading(true);
-        // TODO: 사용자의 채팅방 목록을 조회하는 API (GET /api/chat/rooms/user/{userId})
-        // 현재는 Mock 데이터 사용
-        const mockRooms: ChatRoom[] = [
-          { id: "1", postId: "post-1", post: { id: "post-1", title: "허니버터칩 공구", authorId: "a1" }, lastMessage: "내일 5시에 봬요!", lastMessageTime: "오후 3:24", unreadCount: 2 },
-          { id: "2", postId: "post-2", post: { id: "post-2", title: "생활용품 공구방", authorId: "a2" }, lastMessage: "네 감사합니다!", lastMessageTime: "오전 11:15", unreadCount: 0 },
-        ];
-        setChatRooms(mockRooms);
+        const res = await getUserChatRooms(currentUserId);
+        console.log("💬 채팅방 목록:", res.data);
+        
+        // API 응답 형식에 맞게 변환
+        const rooms = (res.data.chatRooms || []).map((room: any) => ({
+          id: room.id,
+          postId: room.postId,
+          post: room.post,
+          lastMessage: room.lastMessage?.content || "",
+          lastMessageTime: room.lastMessage?.createdAt 
+            ? new Date(room.lastMessage.createdAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+            : "",
+          unreadCount: room.unreadCount || 0,
+        }));
+        
+        setChatRooms(rooms);
       } catch (err) {
         console.error("채팅방 목록 로드 실패:", err);
+        // API 실패 시 빈 목록 표시
+        setChatRooms([]);
       } finally {
         setLoading(false);
       }
     };
     fetchChatRooms();
-  }, []);
+  }, [currentUserId]);
 
   // 채팅방 선택 시 메시지 로드
   useEffect(() => {
@@ -78,16 +94,17 @@ export default function Chat() {
       try {
         const res = await getMessages(selectedRoom.id);
         console.log("📨 메시지 목록:", res.data);
-        setMessages(res.data || []);
-        if (currentUserId) await markAllMessagesAsRead(selectedRoom.id, currentUserId);
+        setMessages(res.data.messages || res.data || []);
+        if (currentUserId) {
+          try {
+            await markAllMessagesAsRead(selectedRoom.id, currentUserId);
+          } catch (e) {
+            console.error("읽음 처리 실패:", e);
+          }
+        }
       } catch (err) {
-        console.error("메시지 로드 실패 (Mock 사용):", err);
-        setMessages([
-          { id: "1", chatRoomId: selectedRoom.id, senderId: "other-user", content: "안녕하세요! 공동구매 참여하고 싶어요", messageType: "text", isRead: true, createdAt: new Date().toISOString(), sender: { id: "other-user", nickname: "김민지" } },
-          { id: "2", chatRoomId: selectedRoom.id, senderId: currentUserId, content: "네! 환영합니다 😊", messageType: "text", isRead: true, createdAt: new Date().toISOString() },
-          { id: "3", chatRoomId: selectedRoom.id, senderId: "other-user", content: "수령은 언제 어디서 하나요?", messageType: "text", isRead: true, createdAt: new Date().toISOString(), sender: { id: "other-user", nickname: "김민지" } },
-          { id: "4", chatRoomId: selectedRoom.id, senderId: currentUserId, content: "내일 오후 5시에 도서관 앞에서 만나요!", messageType: "text", isRead: true, createdAt: new Date().toISOString() },
-        ]);
+        console.error("메시지 로드 실패:", err);
+        setMessages([]);
       }
     };
     fetchMessages();

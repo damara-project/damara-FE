@@ -9,11 +9,10 @@ export default function BottomNav() {
   const { pathname } = useLocation();
   const { isDarkMode } = useTheme();
 
-  // 다크모드 스타일 (새 색상 가이드 적용)
+  // 다크모드 스타일
   const bgColor = isDarkMode ? "rgba(21, 28, 43, 0.95)" : "rgba(255, 255, 255, 0.95)";
   const borderColor = isDarkMode ? "#1A2233" : "#e5e7eb";
   const textInactive = isDarkMode ? "#6B7688" : "#9ca3af";
-  const textActive = isDarkMode ? "#4F8BFF" : undefined;
 
   const tabs = [
     { id: "/home", icon: Home, label: "홈", gradient: "from-[#1A2F4A] to-[#355074]" },
@@ -49,23 +48,15 @@ export default function BottomNav() {
 
               {/* 아이콘 */}
               <Icon
-                className={`w-6 h-6 transition-all ${
-                  active
-                    ? `bg-gradient-to-r ${tab.gradient} bg-clip-text text-transparent`
-                    : ""
-                }`}
-                style={!active ? { color: textInactive } : undefined}
+                className="w-6 h-6 transition-all"
+                style={{ color: active ? "#1A2F4A" : textInactive }}
                 strokeWidth={active ? 2.5 : 1.5}
               />
 
               {/* 텍스트 */}
               <span
-                className={`text-[10px] transition-all ${
-                  active
-                    ? `bg-gradient-to-r ${tab.gradient} bg-clip-text text-transparent`
-                    : ""
-                }`}
-                style={!active ? { color: textInactive } : undefined}
+                className="text-[10px] transition-all"
+                style={{ color: active ? "#1A2F4A" : textInactive }}
               >
                 {tab.label}
               </span>

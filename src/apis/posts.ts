@@ -76,3 +76,37 @@ export const getParticipants = (postId: string) =>
 // 사용자가 참여한 게시글 목록 조회
 export const getParticipatedPosts = (userId: string) =>
   axiosInstance.get(`/api/posts/user/${userId}/participated`);
+
+// ===== 게시글 상태 변경 =====
+
+// 게시글 상태 변경 (작성자만 가능)
+export const updatePostStatus = (
+  postId: string,
+  status: "open" | "closed" | "in_progress" | "completed",
+  authorId: string
+) => {
+  const url = `/api/posts/${postId}/status`;
+  const body = { status, authorId };
+  
+  console.log("========== 상태 변경 API 호출 ==========");
+  console.log("📍 URL:", `${axiosInstance.defaults.baseURL}${url}`);
+  console.log("�method: PATCH");
+  console.log("📦 Request Body:", JSON.stringify(body, null, 2));
+  console.log("=========================================");
+  
+  return axiosInstance.patch(url, body);
+};
+
+// ===== 관심(찜) 기능 =====
+
+// 관심 등록
+export const addFavorite = (postId: string, userId: string) =>
+  axiosInstance.post(`/api/posts/${postId}/favorite`, { userId });
+
+// 관심 여부 확인
+export const checkFavorite = (postId: string, userId: string) =>
+  axiosInstance.get(`/api/posts/${postId}/favorite/${userId}`);
+
+// 관심 해제
+export const removeFavorite = (postId: string, userId: string) =>
+  axiosInstance.delete(`/api/posts/${postId}/favorite/${userId}`);

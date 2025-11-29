@@ -6,7 +6,7 @@ import { ArrowLeft, Users, MapPin, Trash2, ImageOff, Pencil, X, Check, ChevronDo
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { getPostDetail, deletePost, updatePost, checkParticipation, participatePost, cancelParticipation } from "../apis/posts";
+import { getPostDetail, deletePost, updatePost, checkParticipation, participatePost, cancelParticipation, addFavorite, checkFavorite, removeFavorite, updatePostStatus } from "../apis/posts";
 import { useTheme } from "../contexts/ThemeContext";
 
 export default function PostDetail() {
@@ -42,7 +42,11 @@ export default function PostDetail() {
 
   // 관심 등록 상태
   const [isFavorite, setIsFavorite] = useState(false);
-  const [favoriteCount, setFavoriteCount] = useState(0);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+  
+  // 상태 변경 로딩
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   // 현재 로그인한 사용자 ID
   const currentUserId = localStorage.getItem("userId");
@@ -79,6 +83,21 @@ export default function PostDetail() {
       }
     };
     checkStatus();
+  }, [id, currentUserId]);
+
+  // 관심 여부 확인
+  useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (!id || !currentUserId) return;
+      try {
+        const res = await checkFavorite(id, currentUserId);
+        console.log("❤️ 관심 여부:", res.data);
+        setIsFavorite(res.data.isFavorite);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    checkFavoriteStatus();
   }, [id, currentUserId]);
 
   // 공동구매 참여
@@ -222,14 +241,64 @@ export default function PostDetail() {
   const imageUrl = post?.images?.[0]?.imageUrl || null;
 
   // 관심 등록/해제 토글
-  const toggleFavorite = () => {
-    // TODO: API 연동 필요 (현재는 로컬 상태만 변경)
-    if (isFavorite) {
-      setIsFavorite(false);
-      setFavoriteCount((prev) => Math.max(0, prev - 1));
-    } else {
-      setIsFavorite(true);
-      setFavoriteCount((prev) => prev + 1);
+  const toggleFavorite = async () => {
+    if (!id || !currentUserId) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+
+    // 먼저 UI 업데이트 (낙관적 업데이트)
+    const newFavoriteState = !isFavorite;
+    setIsFavorite(newFavoriteState);
+
+    try {
+      setFavoriteLoading(true);
+      if (newFavoriteState) {
+        await addFavorite(id, currentUserId);
+      } else {
+        await removeFavorite(id, currentUserId);
+      }
+      console.log("❤️ 관심 등록/해제 성공:", newFavoriteState ? "등록" : "해제");
+    } catch (err: any) {
+      console.error("관심 등록/해제 실패:", err);
+      // API 실패해도 UI는 유지 (백엔드 구현 전까지 임시)
+      // 나중에 백엔드 구현되면 아래 주석 해제
+      // setIsFavorite(!newFavoriteState); // 롤백
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
+  // 상태 목록 정의
+  const statusList = [
+    { value: "open", label: "모집중", color: isDarkMode ? "#4F8BFF" : "#1A2F4A" },
+    { value: "closed", label: "모집완료", color: "#f59e0b" },
+    { value: "in_progress", label: "진행중", color: "#8b5cf6" },
+    { value: "completed", label: "거래완료", color: "#22c55e" },
+  ];
+
+  // 현재 상태의 라벨과 색상 가져오기
+  const currentStatus = statusList.find(s => s.value === post?.status) || statusList[0];
+
+  // 게시글 상태 변경 (작성자만)
+  const handleStatusChange = async (newStatus: string) => {
+    if (!id || !currentUserId) return;
+    const statusLabel = statusList.find(s => s.value === newStatus)?.label || newStatus;
+    
+    try {
+      setStatusLoading(true);
+      setShowStatusDropdown(false);
+      await updatePostStatus(id, newStatus as any, currentUserId);
+      setPost((prev: any) => ({ ...prev, status: newStatus }));
+    } catch (err: any) {
+      console.error("상태 변경 실패:", err);
+      if (err.response?.status === 403) {
+        alert("작성자만 상태를 변경할 수 있습니다.");
+      } else {
+        alert("상태 변경에 실패했습니다.");
+      }
+    } finally {
+      setStatusLoading(false);
     }
   };
 
@@ -307,10 +376,11 @@ export default function PostDetail() {
         {!isOwner && !isEditing && (
           <button
             onClick={toggleFavorite}
-            className="p-2 rounded-lg transition hover:scale-110"
+            disabled={favoriteLoading}
+            className="p-2 rounded-lg transition hover:scale-110 disabled:opacity-50"
           >
             <Heart 
-              className="w-6 h-6 transition-colors" 
+              className={`w-6 h-6 transition-colors ${favoriteLoading ? "animate-pulse" : ""}`}
               style={{ 
                 color: isFavorite ? "#ef4444" : textSecondary,
                 fill: isFavorite ? "#ef4444" : "none"
@@ -367,15 +437,82 @@ export default function PostDetail() {
           {/* 상태/참여인원 */}
           <div className="space-y-3">
             <div className="flex items-start justify-between">
-              <Badge
-                className="px-3 py-1 rounded-full"
-                style={{
-                  backgroundColor: post.status === "open" ? badgeBg : (isDarkMode ? "#374151" : "#9ca3af"),
-                  color: post.status === "open" ? badgeText : "#ffffff"
-                }}
-              >
-                {post.status === "open" ? "모집중" : "마감"}
-              </Badge>
+              {/* 작성자면 상태 변경 가능 */}
+              {isOwner ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                    disabled={statusLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                    style={{
+                      backgroundColor: currentStatus.color,
+                      color: "#ffffff"
+                    }}
+                  >
+                    <span className="text-xs font-medium">{currentStatus.label}</span>
+                    <ChevronDown 
+                      className={`w-3.5 h-3.5 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} 
+                    />
+                  </button>
+                  
+                  {/* 상태 변경 드롭다운 */}
+                  {showStatusDropdown && (
+                    <>
+                      {/* 배경 클릭시 닫기 */}
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setShowStatusDropdown(false)}
+                      />
+                      <div 
+                        className="absolute top-full left-0 mt-2 min-w-[140px] rounded-xl shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-top-2 duration-200"
+                        style={{ 
+                          backgroundColor: bgCard, 
+                          border: `1px solid ${borderColor}`,
+                          boxShadow: isDarkMode 
+                            ? "0 10px 40px rgba(0,0,0,0.5)" 
+                            : "0 10px 40px rgba(0,0,0,0.15)"
+                        }}
+                      >
+                        {statusList.map((status) => (
+                          <button
+                            key={status.value}
+                            onClick={() => handleStatusChange(status.value)}
+                            disabled={statusLoading || post.status === status.value}
+                            className="w-full px-4 py-3 text-sm text-left flex items-center gap-3 transition-colors disabled:opacity-40"
+                            style={{ 
+                              color: textPrimary,
+                              backgroundColor: post.status === status.value 
+                                ? (isDarkMode ? "rgba(79, 139, 255, 0.1)" : "rgba(26, 47, 74, 0.05)") 
+                                : "transparent"
+                            }}
+                          >
+                            <span 
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: status.color }}
+                            />
+                            <span className={post.status === status.value ? "font-medium" : ""}>
+                              {status.label}
+                            </span>
+                            {post.status === status.value && (
+                              <Check className="w-4 h-4 ml-auto" style={{ color: pointColor }} />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <Badge
+                  className="px-3 py-1.5 rounded-full text-xs font-medium"
+                  style={{
+                    backgroundColor: currentStatus.color,
+                    color: "#ffffff"
+                  }}
+                >
+                  {currentStatus.label}
+                </Badge>
+              )}
 
               <div className="flex items-center gap-4 text-sm" style={{ color: textSecondary }}>
                 <div className="flex items-center gap-1.5">
@@ -386,7 +523,6 @@ export default function PostDetail() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Heart className="w-4 h-4" style={{ color: isFavorite ? "#ef4444" : pointColor, fill: isFavorite ? "#ef4444" : "none" }} />
-                  <span>{favoriteCount}</span>
                 </div>
               </div>
             </div>
