@@ -2,10 +2,18 @@
 
 import { useLocation, useNavigate } from "react-router-dom";
 import { Home, MessageCircle, User } from "lucide-react";
+import { useTheme } from "../contexts/ThemeContext";
 
 export default function BottomNav() {
   const nav = useNavigate();
   const { pathname } = useLocation();
+  const { isDarkMode } = useTheme();
+
+  // 다크모드 스타일 (새 색상 가이드 적용)
+  const bgColor = isDarkMode ? "rgba(21, 28, 43, 0.95)" : "rgba(255, 255, 255, 0.95)";
+  const borderColor = isDarkMode ? "#1A2233" : "#e5e7eb";
+  const textInactive = isDarkMode ? "#6B7688" : "#9ca3af";
+  const textActive = isDarkMode ? "#4F8BFF" : undefined;
 
   const tabs = [
     { id: "/home", icon: Home, label: "홈", gradient: "from-[#1A2F4A] to-[#355074]" },
@@ -14,7 +22,13 @@ export default function BottomNav() {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200 max-w-[430px] mx-auto shadow-lg">
+    <div 
+      className="fixed bottom-0 left-0 right-0 backdrop-blur-lg max-w-[430px] mx-auto shadow-lg transition-colors"
+      style={{ 
+        backgroundColor: bgColor,
+        borderTop: `1px solid ${borderColor}`
+      }}
+    >
       <div className="flex justify-around items-center h-16">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -38,8 +52,9 @@ export default function BottomNav() {
                 className={`w-6 h-6 transition-all ${
                   active
                     ? `bg-gradient-to-r ${tab.gradient} bg-clip-text text-transparent`
-                    : "text-gray-400 group-hover:text-gray-600"
+                    : ""
                 }`}
+                style={!active ? { color: textInactive } : undefined}
                 strokeWidth={active ? 2.5 : 1.5}
               />
 
@@ -48,8 +63,9 @@ export default function BottomNav() {
                 className={`text-[10px] transition-all ${
                   active
                     ? `bg-gradient-to-r ${tab.gradient} bg-clip-text text-transparent`
-                    : "text-gray-500 group-hover:text-gray-700"
+                    : ""
                 }`}
+                style={!active ? { color: textInactive } : undefined}
               >
                 {tab.label}
               </span>

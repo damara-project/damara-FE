@@ -1,5 +1,5 @@
 // src/pages/CreatePost.tsx
-import { useState } from "react";
+import React, { useState } from "react";
 import { ArrowLeft, Upload, X } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -21,7 +21,7 @@ export default function CreatePost() {
   const nav = useNavigate();
 
   // 입력값 상태 ----------------------------
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<{ preview: string; url: string }[]>([]);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
@@ -42,38 +42,89 @@ export default function CreatePost() {
       return;
     }
 
+    // 로컬 프리뷰 먼저 생성
+    const preview = URL.createObjectURL(file);
+    const tempIndex = images.length;
+    setImages((prev) => [...prev, { preview, url: "" }]);
+
     try {
       setLoading(true);
-      const res = await uploadImage(file); // { imageUrl: "..." }
-      setImages((prev) => [...prev, res.imageUrl]);
+      const res = await uploadImage(file); // { url: "/uploads/...", filename: "..." }
+      console.log("📷 이미지 업로드 응답:", res); // 디버깅용
+      
+      // 서버 URL + 상대 경로로 전체 URL 생성
+      const baseUrl = "http://3.38.145.117:3000";
+      const imageUrl = res.url.startsWith("http") ? res.url : `${baseUrl}${res.url}`;
+      console.log("📷 완성된 이미지 URL:", imageUrl);
+      
+      // 업로드 성공 시 URL 업데이트
+      setImages((prev) =>
+        prev.map((img, i) =>
+          i === tempIndex ? { ...img, url: imageUrl } : img
+        )
+      );
     } catch (err) {
-      console.error(err);
+      console.error("❌ 이미지 업로드 에러:", err);
       alert("이미지 업로드 실패");
+      // 업로드 실패 시 해당 이미지 제거
+      setImages((prev) => prev.filter((_, i) => i !== tempIndex));
     } finally {
       setLoading(false);
     }
   };
 
   const removeImage = (index: number) => {
+    // 프리뷰 URL 해제
+    URL.revokeObjectURL(images[index].preview);
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   // 등록하기 ----------------------------
   const handleSubmit = async () => {
-    if (!title || !price || !deadline) {
+    if (images.length === 0) {
+      alert("이미지를 최소 1장 이상 업로드해주세요.");
+      return;
+    }
+    if (!title || !price || !deadline || !location || !people) {
       alert("필수 값을 모두 입력해주세요.");
+      return;
+    }
+
+    // 로그인한 사용자 정보 가져오기
+    const userId = localStorage.getItem("userId");
+    if (!userId) {
+      alert("로그인이 필요합니다.");
+      nav("/");
       return;
     }
 
     try {
       setLoading(true);
 
+      const imageUrls = images.map((img) => img.url).filter((url) => url);
+      console.log("📤 전송할 이미지 URLs:", imageUrls); // 디버깅용
+      console.log("📤 전송할 데이터:", {
+        title,
+        content: description || title,
+        price: Number(price),
+        minParticipants: Number(people),
+        deadline,
+        pickupLocation: location,
+        authorId: userId,
+        images: imageUrls,
+        category: category || "etc",
+      });
+
       await createPost({
         title,
+        content: description || title, // 상세 설명 또는 제목
         price: Number(price),
+        minParticipants: Number(people),
         deadline,
-        authorId: "20241234", // 🔥 실제 로그인하면 localStorage에서 studentId 사용해야 함
-        images,
+        pickupLocation: location,
+        authorId: userId,
+        images: imageUrls,
+        category: category || "etc", // 카테고리 추가
       });
 
       alert("게시글이 등록되었습니다!");
@@ -101,30 +152,53 @@ export default function CreatePost() {
       <div className="flex-1 overflow-y-auto p-5 space-y-6 pb-24">
         {/* 이미지 업로드 */}
         <div className="space-y-3">
-          <Label>이미지 ({images.length}/5)</Label>
+          <Label>이미지 ({images.length}/5) <span className="text-red-500">*필수</span></Label>
           
 
-          <div className="flex gap-3 overflow-x-auto pb-2">
+          <div className="flex gap-4 overflow-x-auto pb-2 pt-2 px-1">
             {/* 파일 선택 */}
             <label className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center flex-shrink-0 hover:border-[#6F91BC] transition-colors cursor-pointer">
-              <input type="file" className="hidden" onChange={handleSelectFile} />
+              <input 
+                type="file" 
+                accept="image/*"
+                onChange={handleSelectFile} 
+                style={{ display: 'none' }}
+              />
               <Upload className="w-6 h-6 text-gray-400" />
             </label>
 
             {images.map((image, index) => (
               <div
                 key={index}
-                className="relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden"
+                className="relative w-24 h-24 flex-shrink-0 rounded-xl bg-gray-100"
+                style={{ border: '2px solid #e5e7eb' }}
               >
                 <img
-                  src={image}
-                  className="w-full h-full object-cover"
+                  src={image.preview}
+                  alt=""
+                  className="w-full h-full object-cover rounded-xl"
                 />
+                {/* 업로드 중 표시 */}
+                {!image.url && (
+                  <div 
+                    className="absolute inset-0 bg-black/30 flex items-center justify-center rounded-xl"
+                  >
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
                 <button
                   onClick={() => removeImage(index)}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center"
+                  className="absolute flex items-center justify-center"
+                  style={{ 
+                    top: '4px', 
+                    right: '4px', 
+                    width: '20px', 
+                    height: '20px', 
+                    backgroundColor: 'rgba(0,0,0,0.6)', 
+                    borderRadius: '50%'
+                  }}
                 >
-                  <X className="w-4 h-4 text-white" />
+                  <X className="w-3 h-3 text-white" />
                 </button>
               </div>
             ))}
@@ -150,10 +224,12 @@ export default function CreatePost() {
               <SelectValue placeholder="카테고리를 선택하세요" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="food">식료품</SelectItem>
-              <SelectItem value="living">생활용품</SelectItem>
-              <SelectItem value="electronics">전자제품</SelectItem>
-              <SelectItem value="etc">기타</SelectItem>
+              <SelectItem value="food">먹거리</SelectItem>
+              <SelectItem value="daily">일상용품</SelectItem>
+              <SelectItem value="beauty">뷰티·패션</SelectItem>
+              <SelectItem value="electronics">전자기기</SelectItem>
+              <SelectItem value="school">학용품</SelectItem>
+              <SelectItem value="freemarket">프리마켓</SelectItem>
             </SelectContent>
           </Select>
         </div>

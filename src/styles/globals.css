@@ -41,50 +41,36 @@
 }
 
 /* -------------------------------------------------- */
-/* 3. Tailwind v4 Theme Mapping                        */
-/* -------------------------------------------------- */
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-
-  --color-accent-1: var(--accent-1);
-  --color-accent-2: var(--accent-2);
-
-  --color-border: var(--border);
-  --color-input: var(--input);
-
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) + 4px);
-}
-
-/* -------------------------------------------------- */
-/* 4. Tailwind Base (⚠️ 안정화 버전)                   */
-/* -------------------------------------------------- */
-@layer base {
-  /* ❗ 모든 요소(*)에 @apply 금지 — Tailwind v4에서 레이아웃 망가짐 */
-  /* body 기본 색상만 적용 */
-  body {
-    color: var(--foreground);
-    background: transparent; /* 배경 제거 → Splash 등이 정상 렌더 */
-  }
-}
-
-/* -------------------------------------------------- */
-/* 5. Global Font & Size                               */
+/* 3. Global Font & Size (Tailwind 충돌 없음)          */
 /* -------------------------------------------------- */
 html, body {
   font-family: 'Pretendard', sans-serif;
   font-size: var(--font-size);
+
+  /* 전체 레이아웃 영향 최소화 */
+  margin: 0;
+  padding: 0;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* -------------------------------------------------- */
+/* 4. 기본 Reset (Figma 스타일 유지)                   */
+/* -------------------------------------------------- */
+* {
+  box-sizing: border-box;
+}
+
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, textarea {
+  font-family: inherit;
 }
