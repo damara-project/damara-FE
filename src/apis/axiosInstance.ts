@@ -1,7 +1,12 @@
 import axios from "axios";
 
+// 환경변수가 없으면 에러 발생
+if (!import.meta.env.VITE_API_URL) {
+  console.warn("⚠️ VITE_API_URL이 설정되지 않았습니다. .env 파일을 확인하세요.");
+}
+
 export const axiosInstance = axios.create({
-  baseURL: "/api",
+  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true, // 로그인 기능을 위해 유지
 });
 
