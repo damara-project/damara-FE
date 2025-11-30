@@ -9,7 +9,7 @@ export const getNotifications = (
     unreadOnly?: boolean;
   }
 ) => {
-  return axiosInstance.get("/api/notifications", {
+  return axiosInstance.get("/notifications", {
     headers: { "x-user-id": userId },
     params: {
       userId,
@@ -22,7 +22,7 @@ export const getNotifications = (
 
 // 읽지 않은 알림 개수 조회
 export const getUnreadCount = (userId: string) => {
-  return axiosInstance.get("/api/notifications/unread-count", {
+  return axiosInstance.get("/notifications/unread-count", {
     headers: { "x-user-id": userId },
     params: { userId },
   });
@@ -31,7 +31,7 @@ export const getUnreadCount = (userId: string) => {
 // 모든 알림 읽음 처리
 export const markAllAsRead = (userId: string) => {
   return axiosInstance.patch(
-    "/api/notifications/read-all",
+    "/notifications/read-all",
     { userId },
     { headers: { "x-user-id": userId } }
   );
@@ -40,7 +40,7 @@ export const markAllAsRead = (userId: string) => {
 // 특정 알림 읽음 처리
 export const markAsRead = (notificationId: string, userId: string) => {
   return axiosInstance.patch(
-    `/api/notifications/${notificationId}/read`,
+    `/notifications/${notificationId}/read`,
     { userId },
     { headers: { "x-user-id": userId } }
   );
@@ -48,7 +48,7 @@ export const markAsRead = (notificationId: string, userId: string) => {
 
 // 알림 삭제
 export const deleteNotification = (notificationId: string, userId: string) => {
-  return axiosInstance.delete(`/api/notifications/${notificationId}`, {
+  return axiosInstance.delete(`/notifications/${notificationId}`, {
     headers: { "x-user-id": userId },
     params: { userId },
   });

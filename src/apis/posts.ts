@@ -4,13 +4,13 @@ import axiosInstance from "./axiosInstance";
 
 // 전체 상품 조회 (페이징 및 카테고리 필터링)
 export const getPosts = (limit = 20, offset = 0, category?: string) =>
-  axiosInstance.get(`/api/posts`, {
+  axiosInstance.get(`/posts`, {
     params: { limit, offset, ...(category && category !== "all" && { category }) },
   });
 
 // 상품 상세 조회
 export const getPostDetail = (id: string) =>
-  axiosInstance.get(`/api/posts/${id}`);
+  axiosInstance.get(`/posts/${id}`);
 
 // 상품 등록
 export const createPost = (data: {
@@ -24,7 +24,7 @@ export const createPost = (data: {
   images?: string[];
   category?: string;
 }) =>
-  axiosInstance.post(`/api/posts`, {
+  axiosInstance.post(`/posts`, {
     post: data,
   });
 
@@ -39,11 +39,11 @@ export const updatePost = (
     pickupLocation?: string;
     images?: string[];
   }
-) => axiosInstance.put(`/api/posts/${id}`, data);
+) => axiosInstance.put(`/posts/${id}`, data);
 
 // 상품 삭제
 export const deletePost = (id: string) =>
-  axiosInstance.delete(`/api/posts/${id}`);
+  axiosInstance.delete(`/posts/${id}`);
 
 // 학번으로 상품 조회
 export const getPostsByStudentId = (
@@ -51,7 +51,7 @@ export const getPostsByStudentId = (
   limit = 20,
   offset = 0
 ) =>
-  axiosInstance.get(`/api/posts/student/${studentId}`, {
+  axiosInstance.get(`/posts/student/${studentId}`, {
     params: { limit, offset },
   });
 
@@ -59,23 +59,23 @@ export const getPostsByStudentId = (
 
 // 공동구매 참여
 export const participatePost = (postId: string, userId: string) =>
-  axiosInstance.post(`/api/posts/${postId}/participate`, { userId });
+  axiosInstance.post(`/posts/${postId}/participate`, { userId });
 
 // 공동구매 참여 취소
 export const cancelParticipation = (postId: string, userId: string) =>
-  axiosInstance.delete(`/api/posts/${postId}/participate/${userId}`);
+  axiosInstance.delete(`/posts/${postId}/participate/${userId}`);
 
 // 참여 여부 확인
 export const checkParticipation = (postId: string, userId: string) =>
-  axiosInstance.get(`/api/posts/${postId}/participate/${userId}`);
+  axiosInstance.get(`/posts/${postId}/participate/${userId}`);
 
 // 게시글의 참여자 목록 조회
 export const getParticipants = (postId: string) =>
-  axiosInstance.get(`/api/posts/${postId}/participants`);
+  axiosInstance.get(`/posts/${postId}/participants`);
 
 // 사용자가 참여한 게시글 목록 조회
 export const getParticipatedPosts = (userId: string) =>
-  axiosInstance.get(`/api/posts/user/${userId}/participated`);
+  axiosInstance.get(`/posts/user/${userId}/participated`);
 
 // ===== 게시글 상태 변경 =====
 
@@ -85,7 +85,7 @@ export const updatePostStatus = (
   status: "open" | "closed" | "in_progress" | "completed",
   authorId: string
 ) => {
-  const url = `/api/posts/${postId}/status`;
+  const url = `/posts/${postId}/status`;
   const body = { status, authorId };
   
   console.log("========== 상태 변경 API 호출 ==========");
@@ -101,24 +101,24 @@ export const updatePostStatus = (
 
 // 관심 등록
 export const addFavorite = (postId: string, userId: string) =>
-  axiosInstance.post(`/api/posts/${postId}/favorite`, { userId });
+  axiosInstance.post(`/posts/${postId}/favorite`, { userId });
 
 // 관심 여부 확인
 export const checkFavorite = (postId: string, userId: string) =>
-  axiosInstance.get(`/api/posts/${postId}/favorite/${userId}`);
+  axiosInstance.get(`/posts/${postId}/favorite/${userId}`);
 
 // 관심 해제
 export const removeFavorite = (postId: string, userId: string) =>
-  axiosInstance.delete(`/api/posts/${postId}/favorite/${userId}`);
+  axiosInstance.delete(`/posts/${postId}/favorite/${userId}`);
 
 // 사용자가 관심 등록한 게시글 목록 조회
 // 여러 가능한 엔드포인트 시도
 export const getFavoritePosts = async (userId: string) => {
   // 가능한 엔드포인트 목록
   const endpoints = [
-    `/api/posts/user/${userId}/favorites`,
-    `/api/users/${userId}/favorites`,
-    `/api/favorites/${userId}`,
+    `/posts/user/${userId}/favorites`,
+    `/users/${userId}/favorites`,
+    `/favorites/${userId}`,
   ];
 
   // 첫 번째 엔드포인트 시도
