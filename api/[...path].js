@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   }
 
   // EC2 백엔드 URL (환경변수에서 가져오거나 기본값 사용)
-  const BACKEND_URL = process.env.VITE_API_URL || process.env.BACKEND_URL || 'http://3.38.xxx.xxx:3000';
+  const BACKEND_URL = process.env.VITE_API_URL || process.env.BACKEND_URL || 'http://3.38.145.117:3000';
   
   // 요청 경로 구성 - Vercel의 동적 라우팅 처리
   let path = '';
