@@ -1,9 +1,12 @@
 // Vercel 서버리스 함수 - 모든 API 요청을 EC2로 프록시
 export default async function handler(req, res) {
+  // 모든 HTTP 메서드 허용
+  const allowedMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'];
+  
   // CORS 헤더 설정
-  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', allowedMethods.join(','));
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id');
 
   // OPTIONS 요청 처리 (CORS preflight)
@@ -11,20 +14,33 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // 지원하지 않는 메서드 체크
+  if (!allowedMethods.includes(req.method)) {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
   // EC2 백엔드 URL (환경변수에서 가져오거나 기본값 사용)
-  const BACKEND_URL = process.env.VITE_API_URL || 'http://3.38.xxx.xxx:3000';
+  const BACKEND_URL = process.env.VITE_API_URL || process.env.BACKEND_URL || 'http://3.38.xxx.xxx:3000';
   
-  // 요청 경로 구성
-  const path = Array.isArray(req.query.path) 
-    ? req.query.path.join('/') 
-    : req.query.path || '';
+  // 요청 경로 구성 - Vercel의 동적 라우팅 처리
+  let path = '';
+  if (req.query.path) {
+    if (Array.isArray(req.query.path)) {
+      path = req.query.path.join('/');
+    } else {
+      path = req.query.path;
+    }
+  }
   
   const apiPath = path ? `/api/${path}` : '/api';
   
   // 쿼리 파라미터 구성 (path 제외)
   const queryParams = Object.keys(req.query)
     .filter(key => key !== 'path')
-    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(req.query[key])}`)
+    .map(key => {
+      const value = req.query[key];
+      return `${encodeURIComponent(key)}=${encodeURIComponent(Array.isArray(value) ? value.join(',') : value)}`;
+    })
     .join('&');
   const queryString = queryParams ? `?${queryParams}` : '';
   
@@ -35,17 +51,18 @@ export default async function handler(req, res) {
     // 요청 헤더 구성 (Authorization, x-user-id 등 전달)
     const headers = {};
 
-    // Content-Type 설정 (multipart/form-data인 경우 제외)
-    if (req.headers['content-type'] && !req.headers['content-type'].includes('multipart/form-data')) {
-      headers['Content-Type'] = req.headers['content-type'];
-    }
+    // 모든 헤더 전달 (단, host, connection 등은 제외)
+    const excludeHeaders = ['host', 'connection', 'content-length', 'transfer-encoding'];
+    Object.keys(req.headers).forEach(key => {
+      const lowerKey = key.toLowerCase();
+      if (!excludeHeaders.includes(lowerKey)) {
+        headers[key] = req.headers[key];
+      }
+    });
 
-    if (req.headers.authorization) {
-      headers.Authorization = req.headers.authorization;
-    }
-
-    if (req.headers['x-user-id']) {
-      headers['x-user-id'] = req.headers['x-user-id'];
+    // Content-Type이 없으면 기본값 설정
+    if (!headers['Content-Type'] && req.method !== 'GET' && req.method !== 'DELETE') {
+      headers['Content-Type'] = 'application/json';
     }
 
     // 요청 옵션
@@ -56,25 +73,14 @@ export default async function handler(req, res) {
 
     // GET, DELETE가 아닌 경우 body 전달
     if (req.method !== 'GET' && req.method !== 'DELETE') {
-      // FormData인 경우 특별 처리
-      if (req.headers['content-type']?.includes('multipart/form-data')) {
-        // Vercel 서버리스 함수에서는 multipart/form-data를 직접 처리하기 어려움
-        // 따라서 body를 Buffer로 변환하여 전달
-        // 실제로는 axios가 보낸 FormData를 그대로 전달해야 함
-        // 하지만 서버리스 함수에서는 req.body가 이미 파싱된 상태이므로
-        // 원본 요청의 body를 그대로 전달하는 것이 어려움
-        // 대신 FormData를 재구성하거나, raw body를 받아야 함
-        
-        // 임시 해결책: body를 그대로 전달 (Vercel이 자동으로 처리)
-        fetchOptions.body = req.body;
-        // Content-Type은 boundary를 포함해야 하므로 원본 헤더 사용
-        if (req.headers['content-type']) {
-          headers['Content-Type'] = req.headers['content-type'];
-        }
-      } else if (req.body) {
-        fetchOptions.body = JSON.stringify(req.body);
-        if (!headers['Content-Type']) {
-          headers['Content-Type'] = 'application/json';
+      if (req.body) {
+        // FormData인 경우 특별 처리
+        if (req.headers['content-type']?.includes('multipart/form-data')) {
+          // multipart/form-data는 그대로 전달
+          fetchOptions.body = req.body;
+        } else {
+          // JSON인 경우 문자열화
+          fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
         }
       }
     }
@@ -93,11 +99,10 @@ export default async function handler(req, res) {
     }
 
     // 응답 헤더 전달
-    const responseHeaders = {};
     response.headers.forEach((value, key) => {
       // CORS 관련 헤더는 제외
       if (!key.toLowerCase().startsWith('access-control-')) {
-        responseHeaders[key] = value;
+        res.setHeader(key, value);
       }
     });
 
@@ -105,9 +110,12 @@ export default async function handler(req, res) {
     return res.status(response.status).json(data);
   } catch (error) {
     console.error('프록시 에러:', error);
+    console.error('요청 URL:', targetUrl);
+    console.error('요청 메서드:', req.method);
     return res.status(500).json({
       error: '프록시 요청 실패',
       message: error.message,
+      url: targetUrl,
     });
   }
 }
