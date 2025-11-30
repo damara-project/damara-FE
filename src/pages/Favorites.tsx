@@ -1,12 +1,12 @@
-// src/pages/ParticipatedPosts.tsx
+// src/pages/Favorites.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import PostCard from "../components/PostCard";
-import { getParticipatedPosts } from "../apis/posts";
+import { getFavoritePosts } from "../apis/posts";
 import { useTheme } from "../contexts/ThemeContext";
 
-export default function ParticipatedPosts() {
+export default function Favorites() {
   const nav = useNavigate();
   const { isDarkMode } = useTheme();
   const [posts, setPosts] = useState<any[]>([]);
@@ -20,7 +20,7 @@ export default function ParticipatedPosts() {
   const borderColor = isDarkMode ? "#1A2233" : "#f3f4f6";
 
   useEffect(() => {
-    const fetchParticipatedPosts = async () => {
+    const fetchFavoritePosts = async () => {
       const userId = localStorage.getItem("userId");
       if (!userId) {
         setError("로그인이 필요합니다.");
@@ -30,21 +30,38 @@ export default function ParticipatedPosts() {
 
       try {
         setLoading(true);
-        const res = await getParticipatedPosts(userId);
-        console.log("📦 참여한 게시글 전체 응답:", res);
-        console.log("📦 참여한 게시글 data:", res.data);
-        // 응답 구조에 따라 처리
-        const postsData = res.data?.posts || res.data || [];
-        setPosts(Array.isArray(postsData) ? postsData : []);
-      } catch (err) {
-        console.error(err);
-        setError("게시글을 불러올 수 없습니다.");
+        const res = await getFavoritePosts(userId);
+        console.log("❤️ 관심목록 전체 응답:", res);
+        console.log("❤️ 관심목록 data:", res.data);
+        
+        // 다양한 응답 구조 처리
+        let postsData: any[] = [];
+        if (Array.isArray(res.data)) {
+          postsData = res.data;
+        } else if (res.data?.posts && Array.isArray(res.data.posts)) {
+          postsData = res.data.posts;
+        } else if (res.data?.favorites && Array.isArray(res.data.favorites)) {
+          postsData = res.data.favorites;
+        } else if (res.data?.data && Array.isArray(res.data.data)) {
+          postsData = res.data.data;
+        }
+        
+        setPosts(postsData);
+      } catch (err: any) {
+        console.error("관심목록 로드 실패:", err);
+        if (err.response?.status === 404) {
+          // API가 아직 구현되지 않은 경우 빈 목록 표시 (에러 없이)
+          setPosts([]);
+          setError(null);
+        } else {
+          setError("관심목록을 불러올 수 없습니다.");
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchParticipatedPosts();
+    fetchFavoritePosts();
   }, []);
 
   return (
@@ -60,7 +77,7 @@ export default function ParticipatedPosts() {
         <button onClick={() => nav(-1)} className="p-1">
           <ArrowLeft className="w-6 h-6" style={{ color: textPrimary }} />
         </button>
-        <h2 style={{ color: textPrimary }}>참여한 공동구매</h2>
+        <h2 style={{ color: textPrimary }}>관심목록</h2>
       </div>
 
       {/* 로딩 */}
@@ -78,11 +95,11 @@ export default function ParticipatedPosts() {
         <div style={{ backgroundColor: bgMain }}>
           {posts.length === 0 ? (
             <div className="text-center py-12" style={{ color: textSecondary }}>
-              참여한 공동구매가 없습니다.
+              관심 등록한 게시글이 없습니다.
             </div>
           ) : (
             posts.map((item) => {
-              // 참여 정보 안에 post 객체가 있음
+              // 응답 구조에 따라 post 객체 추출
               const post = item.post || item;
               console.log("📷 게시글 이미지:", post.images);
               return (

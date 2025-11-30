@@ -86,7 +86,7 @@ export default function Login() {
       <div className="w-full max-w-[430px] flex flex-col">
 
         {/* 🔵 DAMARA 텍스트 로고 + 슬로건 - 중앙 배치 */}
-        <div className="mb-10 text-center">
+        <div className="mb-16 text-center">
           <h1
             className="font-extrabold tracking-tight text-[#355074]"
             style={{ fontFamily: "Montserrat", fontSize: "3rem" }}
@@ -98,8 +98,8 @@ export default function Login() {
           </p>
         </div>
 
-        {/* 🔵 입력 폼 - 위로 올림 */}
-        <div className="w-full max-w-sm space-y-5">
+        {/* 🔵 입력 폼 */}
+        <div className="w-full max-w-sm space-y-4" style={{ marginTop: '40px' }}>
 
           {/* 에러 메시지 */}
           {error && (
@@ -110,7 +110,6 @@ export default function Login() {
 
           {/* 학번 */}
           <div>
-            <p className="text-xs text-gray-600 font-medium mb-1">학번</p>
             <div className="relative">
               <input
                 type="text"
@@ -138,7 +137,6 @@ export default function Login() {
 
           {/* 비밀번호 */}
           <div>
-            <p className="text-xs text-gray-600 font-medium mb-1">비밀번호</p>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}

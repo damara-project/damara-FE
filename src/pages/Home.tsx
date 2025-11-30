@@ -1,11 +1,12 @@
 // src/pages/Home.tsx
 import { useState, useEffect, useRef } from "react";
-import { ChevronDown, Search, Menu, Bell, Plus, X, Settings, HelpCircle, Info, LogOut, User } from "lucide-react";
+import { ChevronDown, Search, Menu, Bell, Plus, X, Settings, HelpCircle, Info, LogOut, User, Filter, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import PostCard from "../components/PostCard";
 import { Button } from "../components/ui/button";
 import { getPosts } from "../apis/posts";
+import { getNotifications, getUnreadCount, markAllAsRead, markAsRead } from "../apis/notifications";
 import { useTheme } from "../contexts/ThemeContext";
 
 export default function Home() {
@@ -30,14 +31,12 @@ export default function Home() {
   // 모달 상태
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [showCategorySheet, setShowCategorySheet] = useState(false);
 
-  // 샘플 알림 데이터
-  const notifications = [
-    { id: 1, title: "새로운 참여자", message: "호빵 공동구매에 새로운 참여자가 있습니다.", time: "방금 전", isNew: true },
-    { id: 2, title: "공동구매 마감 임박", message: "참여하신 공동구매가 곧 마감됩니다.", time: "10분 전", isNew: true },
-    { id: 3, title: "거래 완료", message: "라면 공동구매가 완료되었습니다.", time: "1시간 전", isNew: false },
-    { id: 4, title: "새로운 공동구매", message: "관심 카테고리에 새 공동구매가 등록되었습니다.", time: "3시간 전", isNew: false },
-  ];
+  // 알림 상태
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
 
   // 카테고리
   const [activeCategory, setActiveCategory] = useState("all");
@@ -64,30 +63,29 @@ export default function Home() {
     }
   }, [showSearch]);
 
-  // 검색 + 카테고리 필터링된 게시글
+  // 검색어 필터링된 게시글 (카테고리는 서버에서 필터링)
   const filteredPosts = posts.filter((post) => {
-    // 검색어 필터링
-    const matchesSearch = searchQuery === "" || 
+    // 검색어 필터링만 클라이언트에서 처리
+    if (searchQuery === "") return true;
+    
+    return (
       post.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.pickupLocation?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    // 카테고리 필터링 (전체면 모든 게시글, 아니면 해당 카테고리만)
-    const matchesCategory = activeCategory === "all" || post.category === activeCategory;
-    
-    return matchesSearch && matchesCategory;
+      post.pickupLocation?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   });
 
   // ===== API 호출 =====
   useEffect(() => {
     const fetchPosts = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await getPosts(); // GET /api/posts
+        // 카테고리 파라미터 전달 (all이면 undefined로 전달하여 전체 조회)
+        const categoryParam = activeCategory === "all" ? undefined : activeCategory;
+        const res = await getPosts(20, 0, categoryParam); // GET /api/posts
         console.log("📦 Posts API 응답:", res.data); // 디버깅용
-        // 각 게시글의 category 확인
-        res.data.forEach((post: any, i: number) => {
-          console.log(`📋 게시글[${i}] "${post.title}" category:`, post.category);
-        });
+        console.log("📂 선택된 카테고리:", activeCategory);
         setPosts(res.data); // 배열 형태 그대로 세팅됨
       } catch (e) {
         setError("게시글을 불러올 수 없습니다.");
@@ -98,63 +96,140 @@ export default function Home() {
     };
 
     fetchPosts();
+  }, [activeCategory]); // activeCategory가 변경될 때마다 API 호출
+
+  // ===== 알림 API 호출 =====
+  const userId = localStorage.getItem("userId") || "";
+
+  // 알림 목록 조회
+  const fetchNotifications = async () => {
+    if (!userId) return;
+    setNotificationsLoading(true);
+    try {
+      const res = await getNotifications(userId);
+      console.log("🔔 Notifications API 응답:", res.data);
+      setNotifications(res.data.notifications || []);
+      setUnreadCount(res.data.unreadCount || 0);
+    } catch (e) {
+      console.error("알림 조회 실패:", e);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  // 읽지 않은 알림 개수 조회
+  const fetchUnreadCount = async () => {
+    if (!userId) return;
+    try {
+      const res = await getUnreadCount(userId);
+      setUnreadCount(res.data.unreadCount || 0);
+    } catch (e) {
+      console.error("읽지 않은 알림 개수 조회 실패:", e);
+    }
+  };
+
+  // 모든 알림 읽음 처리
+  const handleMarkAllAsRead = async () => {
+    if (!userId) return;
+    try {
+      await markAllAsRead(userId);
+      // 알림 목록 새로고침
+      fetchNotifications();
+    } catch (e) {
+      console.error("모든 알림 읽음 처리 실패:", e);
+    }
+  };
+
+  // 특정 알림 읽음 처리
+  const handleMarkAsRead = async (notificationId: string) => {
+    if (!userId) return;
+    try {
+      await markAsRead(notificationId, userId);
+      // 알림 목록 새로고침
+      fetchNotifications();
+    } catch (e) {
+      console.error("알림 읽음 처리 실패:", e);
+    }
+  };
+
+  // 컴포넌트 마운트 시 읽지 않은 알림 개수 조회
+  useEffect(() => {
+    fetchUnreadCount();
   }, []);
+
+  // 알림 모달 열릴 때 알림 목록 조회
+  useEffect(() => {
+    if (showNotificationModal) {
+      fetchNotifications();
+    }
+  }, [showNotificationModal]);
 
   return (
     <div 
       className="relative min-h-screen pb-20 transition-colors"
       style={{ backgroundColor: bgMain }}
     >
+      {/* 스크롤바 숨기기 스타일 */}
+      <style>
+        {`
+          .category-scroll::-webkit-scrollbar {
+            display: none;
+          }
+        `}
+      </style>
       {/* ===== 헤더 ===== */}
       <div 
         className="sticky top-0 z-10 transition-colors"
-        style={{ 
-          backgroundColor: bgMain,
-          borderBottom: `1px solid ${borderColor}`
-        }}
+        style={{ backgroundColor: bgMain }}
       >
         <div className="px-4 py-3 flex items-center justify-between">
           {/* 검색 모드가 아닐 때 */}
           {!showSearch ? (
             <>
-              <button className="flex items-center gap-1 group">
-                <span className="bg-gradient-to-r from-[#1A2F4A] to-[#355074] bg-clip-text text-transparent">
+              <button className="flex items-center gap-1.5 group">
+                <span 
+                  className="text-lg font-semibold"
+                  style={{ color: isDarkMode ? "#FFFFFF" : "#1A2F4A" }}
+                >
                   명지대
                 </span>
-                <ChevronDown className="w-5 h-5 text-[#6F91BC] group-hover:text-[#355074]" />
+                <ChevronDown className="w-5 h-5" style={{ color: isDarkMode ? "#A7B1C2" : "#6F91BC" }} />
               </button>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setShowSearch(true)}
-                  className="p-2 rounded-full transition-colors"
-                  style={{ backgroundColor: isDarkMode ? "rgba(79, 139, 255, 0.15)" : "transparent" }}
+                  className="p-1.5 transition-colors"
                 >
-                  <Search className="w-6 h-6" style={{ color: pointColor }} />
+                  <Search className="w-6 h-6" style={{ color: isDarkMode ? "#A7B1C2" : "#6b7280" }} />
                 </button>
                 <button 
                   onClick={() => setShowMenuModal(true)}
-                  className="p-2 rounded-full transition-colors"
-                  style={{ backgroundColor: isDarkMode ? "rgba(79, 139, 255, 0.15)" : "transparent" }}
+                  className="p-1.5 transition-colors"
                 >
-                  <Menu className="w-6 h-6" style={{ color: pointColor }} />
+                  <Menu className="w-6 h-6" style={{ color: isDarkMode ? "#A7B1C2" : "#6b7280" }} />
                 </button>
                 <button 
                   onClick={() => setShowNotificationModal(true)}
-                  className="p-2 relative rounded-full transition-colors"
-                  style={{ backgroundColor: isDarkMode ? "rgba(79, 139, 255, 0.15)" : "transparent" }}
+                  className="p-1.5 relative transition-colors"
                 >
-                  <Bell className="w-6 h-6" style={{ color: pointColor }} />
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "#4F8BFF" }}></span>
+                  <Bell className="w-6 h-6" style={{ color: isDarkMode ? "#A7B1C2" : "#6b7280" }} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
                 </button>
               </div>
             </>
           ) : (
-            /* 검색 모드일 때 */
             <div className="flex items-center gap-3 w-full">
               <div 
-                className="flex-1 flex items-center gap-2 px-4 py-2 rounded-xl"
-                style={{ backgroundColor: bgIcon }}
+                className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-200"
+                style={{ 
+                  backgroundColor: isDarkMode ? "#1A2233" : "#f9fafb",
+                  border: `1px solid ${isDarkMode ? "#1A2233" : "#e5e7eb"}`
+                }}
               >
                 <Search className="w-5 h-5 flex-shrink-0" style={{ color: textSecondary }} />
                 <input
@@ -163,24 +238,39 @@ export default function Home() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="공동구매 검색..."
-                  className="flex-1 bg-transparent outline-none text-sm"
+                  className="flex-1 bg-transparent outline-none text-[15px] placeholder:text-gray-400 focus:outline-none"
                   style={{ color: textPrimary }}
+                  onFocus={(e) => {
+                    const container = e.currentTarget.parentElement;
+                    if (container) {
+                      container.style.backgroundColor = isDarkMode ? "#1A2233" : "#ffffff";
+                      container.style.borderColor = isDarkMode ? "#4F8BFF" : "#355074";
+                      container.style.boxShadow = isDarkMode 
+                        ? "0 0 0 2px rgba(79, 139, 255, 0.2)" 
+                        : "0 0 0 2px rgba(53, 80, 116, 0.2)";
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const container = e.currentTarget.parentElement;
+                    if (container) {
+                      container.style.backgroundColor = isDarkMode ? "#1A2233" : "#f9fafb";
+                      container.style.borderColor = isDarkMode ? "#1A2233" : "#e5e7eb";
+                      container.style.boxShadow = "none";
+                    }
+                  }}
                 />
                 {searchQuery && (
                   <button 
-                    onClick={() => setSearchQuery("")}
-                    className="p-1"
+                    onClick={() => setSearchQuery("")} 
+                    className="p-1 hover:opacity-70 transition-opacity"
                   >
                     <X className="w-4 h-4" style={{ color: textSecondary }} />
                   </button>
                 )}
               </div>
               <button
-                onClick={() => {
-                  setShowSearch(false);
-                  setSearchQuery("");
-                }}
-                className="px-3 py-2 text-sm font-medium"
+                onClick={() => { setShowSearch(false); setSearchQuery(""); }}
+                className="px-3 py-2 text-sm font-medium hover:opacity-80 transition-opacity"
                 style={{ color: pointColor }}
               >
                 취소
@@ -189,24 +279,26 @@ export default function Home() {
           )}
         </div>
 
-        {/* ===== 카테고리 탭 ===== */}
-        <div className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-hide">
+        {/* ===== 카테고리 칩 ===== */}
+        <div 
+          className="category-scroll flex gap-2 overflow-x-auto px-4 pb-3"
+          style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
+        >
           {categories.map((category) => (
             <button
               key={category.id}
               onClick={() => setActiveCategory(category.id)}
-              className={`px-4 py-2 text-sm rounded-full whitespace-nowrap transition-all shadow-sm
-                ${
-                  activeCategory === category.id
-                    ? `bg-gradient-to-r ${category.color} text-white`
-                    : ""
+              className={`px-3 py-1.5 text-sm rounded-full whitespace-nowrap transition-all
+                ${activeCategory === category.id 
+                  ? "bg-[#1A2F4A] text-white border-transparent shadow-sm" 
+                  : "bg-white border border-gray-200 shadow-none"
                 }`}
               style={
                 activeCategory !== category.id
                   ? {
-                      backgroundColor: bgCard,
-                      color: textPrimary,
-                      border: `1px solid ${borderColor}`,
+                      backgroundColor: isDarkMode ? "#151C2B" : "#ffffff",
+                      color: isDarkMode ? "#A7B1C2" : "#6b7280",
+                      borderColor: isDarkMode ? "#1A2233" : "#e5e7eb",
                     }
                   : undefined
               }
@@ -230,10 +322,10 @@ export default function Home() {
       {/* ===== 검색 결과 안내 ===== */}
       {showSearch && searchQuery && !loading && (
         <div 
-          className="px-4 py-3"
-          style={{ backgroundColor: bgMain, borderBottom: `1px solid ${borderColor}` }}
+          className="px-4 py-2"
+          style={{ backgroundColor: bgMain }}
         >
-          <p className="text-sm" style={{ color: textSecondary }}>
+          <p className="text-xs" style={{ color: textSecondary }}>
             <span style={{ color: pointColor }}>"{searchQuery}"</span> 검색 결과 
             <span className="font-medium" style={{ color: textPrimary }}> {filteredPosts.length}개</span>
           </p>
@@ -242,11 +334,11 @@ export default function Home() {
 
       {/* ===== 게시글 리스트 ===== */}
       {!loading && !error && (
-        <div style={{ backgroundColor: bgMain }}>
+        <div className="px-4 pt-2 pb-4" style={{ backgroundColor: bgMain }}>
           {filteredPosts.length === 0 ? (
             <div className="text-center py-12" style={{ color: textSecondary }}>
               {searchQuery ? (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <p>검색 결과가 없습니다.</p>
                   <p className="text-sm" style={{ color: textTertiary }}>다른 키워드로 검색해보세요.</p>
                 </div>
@@ -260,12 +352,12 @@ export default function Home() {
                 key={post.id}
                 id={post.id}
                 title={post.title}
-                price={`${post.price?.toLocaleString() ?? 0}원`}
+                price={`${Math.floor(post.price ?? 0).toLocaleString()}원`}
                 image={post.images?.[0]?.imageUrl || "/placeholder.png"}
                 currentPeople={post.currentQuantity ?? 0}
                 maxPeople={post.minParticipants ?? 2}
                 location={post.pickupLocation || "명지대 캠퍼스"}
-                status={post.status === "open" ? "recruiting" : "closed"}
+                status={post.status || "open"}
                 onClick={() => nav(`/post/${post.id}`)}
                 isDarkMode={isDarkMode}
               />
@@ -274,14 +366,19 @@ export default function Home() {
         </div>
       )}
 
-      {/* ===== Floating Button ===== */}
-      <Button
+      {/* ===== FAB ===== */}
+      <button
         onClick={() => nav("/create")}
-        className="fixed right-4 w-14 h-14 rounded-full bg-gradient-to-br from-[#1A2F4A] to-[#355074] shadow-xl shadow-[#6F91BC]/20 hover:scale-110 transition z-50"
-        style={{ bottom: '72px', right: 'calc(50% - 215px + 16px)' }}
+        className="fixed w-14 h-14 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 z-50"
+        style={{ 
+          bottom: '88px', 
+          right: 'max(24px, calc(50% - 215px + 24px))',
+          background: 'linear-gradient(180deg, #1A2F4A 0%, #253B67 100%)',
+          boxShadow: '0 4px 14px rgba(0, 0, 0, 0.1)'
+        }}
       >
-        <Plus className="w-6 h-6" />
-      </Button>
+        <Plus className="w-7 h-7 text-white" strokeWidth={2} />
+      </button>
 
       {/* ===== 메뉴 모달 ===== */}
       {showMenuModal && (
@@ -440,21 +537,26 @@ export default function Home() {
 
             {/* 알림 목록 */}
             <div className="flex-1 overflow-y-auto">
-              {notifications.length === 0 ? (
+              {notificationsLoading ? (
+                <div className="text-center py-12" style={{ color: textSecondary }}>
+                  불러오는 중...
+                </div>
+              ) : notifications.length === 0 ? (
                 <div className="text-center py-12" style={{ color: textSecondary }}>
                   알림이 없습니다.
                 </div>
               ) : (
                 <div className="p-2">
-                  {notifications.map((notification) => (
+                  {notifications.map((notification: any) => (
                     <div
                       key={notification.id}
                       className="p-3 rounded-xl mb-2 transition-colors cursor-pointer hover:opacity-80"
                       style={{ 
-                        backgroundColor: notification.isNew 
+                        backgroundColor: !notification.isRead 
                           ? (isDarkMode ? "rgba(79, 139, 255, 0.1)" : "rgba(111, 145, 188, 0.1)") 
                           : "transparent"
                       }}
+                      onClick={() => !notification.isRead && handleMarkAsRead(notification.id)}
                     >
                       <div className="flex items-start gap-3">
                         <div 
@@ -468,17 +570,17 @@ export default function Home() {
                             <span className="font-medium" style={{ color: textPrimary }}>
                               {notification.title}
                             </span>
-                            {notification.isNew && (
+                            {!notification.isRead && (
                               <span className="px-2 py-0.5 text-[10px] rounded-full bg-gradient-to-r from-[#6F91BC] to-[#8BA3C3] text-white">
                                 NEW
                               </span>
                             )}
                           </div>
                           <p className="text-sm mt-1" style={{ color: textSecondary }}>
-                            {notification.message}
+                            {notification.message || notification.content}
                           </p>
                           <p className="text-xs mt-1" style={{ color: textTertiary }}>
-                            {notification.time}
+                            {notification.createdAt ? new Date(notification.createdAt).toLocaleString('ko-KR') : ''}
                           </p>
                         </div>
                       </div>
@@ -494,11 +596,12 @@ export default function Home() {
               style={{ borderTop: `1px solid ${borderColor}` }}
             >
               <button
-                onClick={() => setShowNotificationModal(false)}
-                className="w-full py-2 text-sm font-medium rounded-xl"
+                onClick={handleMarkAllAsRead}
+                className="w-full py-2 text-sm font-medium rounded-xl transition-colors hover:opacity-80"
                 style={{ color: pointColor }}
+                disabled={unreadCount === 0}
               >
-                모두 읽음으로 표시
+                모두 읽음으로 표시 {unreadCount > 0 && `(${unreadCount})`}
               </button>
             </div>
           </div>

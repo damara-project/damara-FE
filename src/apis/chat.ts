@@ -9,6 +9,12 @@ export const createChatRoom = (postId: string) =>
     chatRoom: { postId },
   });
 
+// 사용자가 참여한 채팅방 목록 조회
+export const getUserChatRooms = (userId: string, limit = 20, offset = 0) =>
+  axiosInstance.get(`/api/chat/rooms/user/${userId}`, {
+    params: { limit, offset },
+  });
+
 // Post ID로 채팅방 조회 또는 생성
 export const getChatRoomByPostId = (postId: string) =>
   axiosInstance.get(`/api/chat/rooms/post/${postId}`);

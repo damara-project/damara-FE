@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, MapPin, Trash2, ImageOff, Pencil, X, Check, ChevronDown, Heart } from "lucide-react";
+import { ArrowLeft, Users, MapPin, Trash2, ImageOff, Pencil, X, Check, ChevronDown, Heart, MessageCircle } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { getPostDetail, deletePost, updatePost, checkParticipation, participatePost, cancelParticipation } from "../apis/posts";
+import { getPostDetail, deletePost, updatePost, checkParticipation, participatePost, cancelParticipation, addFavorite, checkFavorite, removeFavorite, updatePostStatus } from "../apis/posts";
+import { getChatRoomByPostId } from "../apis/chat";
 import { useTheme } from "../contexts/ThemeContext";
 
 export default function PostDetail() {
@@ -42,7 +43,14 @@ export default function PostDetail() {
 
   // 관심 등록 상태
   const [isFavorite, setIsFavorite] = useState(false);
-  const [favoriteCount, setFavoriteCount] = useState(0);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+  
+  // 상태 변경 로딩
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  
+  // 채팅방 열기
+  const [openingChat, setOpeningChat] = useState(false);
 
   // 현재 로그인한 사용자 ID
   const currentUserId = localStorage.getItem("userId");
@@ -79,6 +87,21 @@ export default function PostDetail() {
       }
     };
     checkStatus();
+  }, [id, currentUserId]);
+
+  // 관심 여부 확인
+  useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (!id || !currentUserId) return;
+      try {
+        const res = await checkFavorite(id, currentUserId);
+        console.log("❤️ 관심 여부:", res.data);
+        setIsFavorite(res.data.isFavorite);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    checkFavoriteStatus();
   }, [id, currentUserId]);
 
   // 공동구매 참여
@@ -222,14 +245,102 @@ export default function PostDetail() {
   const imageUrl = post?.images?.[0]?.imageUrl || null;
 
   // 관심 등록/해제 토글
-  const toggleFavorite = () => {
-    // TODO: API 연동 필요 (현재는 로컬 상태만 변경)
-    if (isFavorite) {
-      setIsFavorite(false);
-      setFavoriteCount((prev) => Math.max(0, prev - 1));
-    } else {
-      setIsFavorite(true);
-      setFavoriteCount((prev) => prev + 1);
+  const toggleFavorite = async () => {
+    if (!id || !currentUserId) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+
+    // 먼저 UI 업데이트 (낙관적 업데이트)
+    const newFavoriteState = !isFavorite;
+    setIsFavorite(newFavoriteState);
+
+    try {
+      setFavoriteLoading(true);
+      if (newFavoriteState) {
+        await addFavorite(id, currentUserId);
+      } else {
+        await removeFavorite(id, currentUserId);
+      }
+      console.log("❤️ 관심 등록/해제 성공:", newFavoriteState ? "등록" : "해제");
+    } catch (err: any) {
+      console.error("관심 등록/해제 실패:", err);
+      // API 실패해도 UI는 유지 (백엔드 구현 전까지 임시)
+      // 나중에 백엔드 구현되면 아래 주석 해제
+      // setIsFavorite(!newFavoriteState); // 롤백
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
+  // 상태 목록 정의 (파스텔톤 색상)
+  const statusList = [
+    { value: "open", label: "모집중", color: isDarkMode ? "#6F91BC" : "#8BA3C3" },
+    { value: "closed", label: "모집완료", color: isDarkMode ? "#A8B5C8" : "#B8C5D8" },
+    { value: "in_progress", label: "진행중", color: isDarkMode ? "#7A9BC4" : "#9BB3D1" },
+    { value: "completed", label: "거래완료", color: isDarkMode ? "#8FA8C0" : "#A5B8D0" },
+  ];
+
+  // 현재 상태의 라벨과 색상 가져오기
+  const currentStatus = statusList.find(s => s.value === post?.status) || statusList[0];
+
+  // 게시글 상태 변경 (작성자만)
+  const handleStatusChange = async (newStatus: string) => {
+    if (!id || !currentUserId) return;
+    const statusLabel = statusList.find(s => s.value === newStatus)?.label || newStatus;
+    
+    try {
+      setStatusLoading(true);
+      setShowStatusDropdown(false);
+      await updatePostStatus(id, newStatus as any, currentUserId);
+      setPost((prev: any) => ({ ...prev, status: newStatus }));
+    } catch (err: any) {
+      console.error("상태 변경 실패:", err);
+      console.error("에러 응답:", err.response?.data);
+      
+      if (err.response?.status === 403) {
+        alert("작성자만 상태를 변경할 수 있습니다.");
+      } else if (err.response?.status === 400) {
+        const errorMessage = err.response?.data?.error || err.response?.data?.message || "상태 변경이 불가능합니다.";
+        alert(errorMessage);
+      } else {
+        const errorMessage = err.response?.data?.error || err.response?.data?.message || "상태 변경에 실패했습니다.";
+        alert(errorMessage);
+      }
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
+  // 채팅방 열기
+  const handleOpenChat = async () => {
+    if (!id || !currentUserId) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+
+    try {
+      setOpeningChat(true);
+      // Post ID로 채팅방 조회 또는 생성
+      const res = await getChatRoomByPostId(id);
+      console.log("💬 채팅방 조회/생성:", res.data);
+      
+      // 채팅방 ID를 쿼리 파라미터로 전달하여 Chat 페이지로 이동
+      const chatRoomId = res.data.id || res.data.chatRoomId;
+      if (chatRoomId) {
+        nav(`/chat?roomId=${chatRoomId}`);
+      } else {
+        nav("/chat");
+      }
+    } catch (err: any) {
+      console.error("채팅방 열기 실패:", err);
+      if (err.response?.status === 404) {
+        alert("게시글을 찾을 수 없습니다.");
+      } else {
+        alert("채팅방을 열 수 없습니다.");
+      }
+    } finally {
+      setOpeningChat(false);
     }
   };
 
@@ -307,10 +418,11 @@ export default function PostDetail() {
         {!isOwner && !isEditing && (
           <button
             onClick={toggleFavorite}
-            className="p-2 rounded-lg transition hover:scale-110"
+            disabled={favoriteLoading}
+            className="p-2 rounded-lg transition hover:scale-110 disabled:opacity-50"
           >
             <Heart 
-              className="w-6 h-6 transition-colors" 
+              className={`w-6 h-6 transition-colors ${favoriteLoading ? "animate-pulse" : ""}`}
               style={{ 
                 color: isFavorite ? "#ef4444" : textSecondary,
                 fill: isFavorite ? "#ef4444" : "none"
@@ -367,15 +479,82 @@ export default function PostDetail() {
           {/* 상태/참여인원 */}
           <div className="space-y-3">
             <div className="flex items-start justify-between">
-              <Badge
-                className="px-3 py-1 rounded-full"
-                style={{
-                  backgroundColor: post.status === "open" ? badgeBg : (isDarkMode ? "#374151" : "#9ca3af"),
-                  color: post.status === "open" ? badgeText : "#ffffff"
-                }}
-              >
-                {post.status === "open" ? "모집중" : "마감"}
-              </Badge>
+              {/* 작성자면 상태 변경 가능 */}
+              {isOwner ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                    disabled={statusLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                    style={{
+                      backgroundColor: currentStatus.color,
+                      color: "#ffffff"
+                    }}
+                  >
+                    <span className="text-xs font-medium">{currentStatus.label}</span>
+                    <ChevronDown 
+                      className={`w-3.5 h-3.5 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} 
+                    />
+                  </button>
+                  
+                  {/* 상태 변경 드롭다운 */}
+                  {showStatusDropdown && (
+                    <>
+                      {/* 배경 클릭시 닫기 */}
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setShowStatusDropdown(false)}
+                      />
+                      <div 
+                        className="absolute top-full left-0 mt-2 min-w-[140px] rounded-xl shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-top-2 duration-200"
+                        style={{ 
+                          backgroundColor: bgCard, 
+                          border: `1px solid ${borderColor}`,
+                          boxShadow: isDarkMode 
+                            ? "0 10px 40px rgba(0,0,0,0.5)" 
+                            : "0 10px 40px rgba(0,0,0,0.15)"
+                        }}
+                      >
+                        {statusList.map((status) => (
+                          <button
+                            key={status.value}
+                            onClick={() => handleStatusChange(status.value)}
+                            disabled={statusLoading || post.status === status.value}
+                            className="w-full px-4 py-3 text-sm text-left flex items-center gap-3 transition-colors disabled:opacity-40"
+                            style={{ 
+                              color: textPrimary,
+                              backgroundColor: post.status === status.value 
+                                ? (isDarkMode ? "rgba(79, 139, 255, 0.1)" : "rgba(26, 47, 74, 0.05)") 
+                                : "transparent"
+                            }}
+                          >
+                            <span 
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: status.color }}
+                            />
+                            <span className={post.status === status.value ? "font-medium" : ""}>
+                              {status.label}
+                            </span>
+                            {post.status === status.value && (
+                              <Check className="w-4 h-4 ml-auto" style={{ color: pointColor }} />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <Badge
+                  className="px-3 py-1.5 rounded-full text-xs font-medium"
+                  style={{
+                    backgroundColor: currentStatus.color,
+                    color: "#ffffff"
+                  }}
+                >
+                  {currentStatus.label}
+                </Badge>
+              )}
 
               <div className="flex items-center gap-4 text-sm" style={{ color: textSecondary }}>
                 <div className="flex items-center gap-1.5">
@@ -383,10 +562,6 @@ export default function PostDetail() {
                   <span>
                     {post.currentQuantity ?? 0}/{post.minParticipants ?? 2}명
                   </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Heart className="w-4 h-4" style={{ color: isFavorite ? "#ef4444" : pointColor, fill: isFavorite ? "#ef4444" : "none" }} />
-                  <span>{favoriteCount}</span>
                 </div>
               </div>
             </div>
@@ -428,7 +603,7 @@ export default function PostDetail() {
               </div>
             ) : (
               <p className="font-semibold" style={{ color: pointColor }}>
-                1인당 {Number(post.price).toLocaleString()}원
+                1인당 {Math.floor(Number(post.price)).toLocaleString()}원
               </p>
             )}
 
@@ -472,26 +647,28 @@ export default function PostDetail() {
         </div>
       </div>
 
-      {/* 참여/취소 버튼 (본인 게시글이 아닐 때만) */}
+      {/* 하단 버튼 영역 (작성자가 아닐 때만 표시) */}
       {!isOwner && post.status === "open" && (
         <div 
           className="sticky bottom-0 p-4 transition-colors"
           style={{ backgroundColor: bgMain, borderTop: `1px solid ${borderColor}` }}
         >
           {isParticipant ? (
+            // 참여자일 때: 채팅하기 버튼
             <Button
-              onClick={handleCancelParticipation}
-              disabled={participating}
-              className="w-full py-6 rounded-xl hover:bg-red-900/20"
+              onClick={handleOpenChat}
+              disabled={openingChat}
+              className="w-full py-6 rounded-xl transition-colors"
               style={{ 
-                border: '2px solid #E85A59', 
-                color: '#E85A59',
-                backgroundColor: isDarkMode ? "transparent" : "white"
+                backgroundColor: isDarkMode ? "#4F8BFF" : "#1A2F4A",
+                color: "#ffffff"
               }}
             >
-              {participating ? "처리 중..." : "참여 취소"}
+              <MessageCircle className="w-5 h-5 mr-2" />
+              {openingChat ? "열기 중..." : "채팅하기"}
             </Button>
           ) : (
+            // 비참여자일 때: 참여하기 버튼
             <Button
               onClick={handleParticipate}
               disabled={participating}
