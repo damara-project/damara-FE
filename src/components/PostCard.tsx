@@ -1,7 +1,8 @@
 // src/components/PostCard.tsx
 
-import { useState } from "react";
-import { MapPin, Users, ImageOff } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MapPin, Users, ImageOff, Heart } from "lucide-react";
+import { checkFavorite, addFavorite, removeFavorite } from "../apis/posts";
 
 export interface PostCardProps {
   id: number;
@@ -11,12 +12,13 @@ export interface PostCardProps {
   currentPeople: number;
   maxPeople: number;
   location: string;
-  status: "recruiting" | "completed";
+  status: "open" | "closed" | "in_progress" | "completed" | "recruiting";
   onClick?: () => void;
   isDarkMode?: boolean;
 }
 
 export default function PostCard({
+  id,
   image,
   title,
   price,
@@ -29,6 +31,45 @@ export default function PostCard({
 }: PostCardProps) {
   const progressPercent = (currentPeople / maxPeople) * 100;
   const [imgError, setImgError] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const currentUserId = localStorage.getItem("userId") || "";
+
+  // 관심 여부 확인
+  useEffect(() => {
+    if (currentUserId && id) {
+      checkFavorite(String(id), currentUserId)
+        .then((res) => {
+          setIsFavorite(res.data.isFavorite || false);
+        })
+        .catch(() => {
+          setIsFavorite(false);
+        });
+    }
+  }, [id, currentUserId]);
+
+  // 하트 클릭 핸들러
+  const handleHeartClick = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 방지
+    if (!currentUserId || favoriteLoading) return;
+
+    const newFavoriteState = !isFavorite;
+    setIsFavorite(newFavoriteState);
+    setFavoriteLoading(true);
+
+    try {
+      if (newFavoriteState) {
+        await addFavorite(String(id), currentUserId);
+      } else {
+        await removeFavorite(String(id), currentUserId);
+      }
+    } catch (err) {
+      console.error("관심 등록/해제 실패:", err);
+      setIsFavorite(!newFavoriteState); // 롤백
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
 
   // 다크모드 스타일 (새 색상 가이드 적용)
   const textPrimary = isDarkMode ? "#FFFFFF" : "#111827";
@@ -37,8 +78,21 @@ export default function PostCard({
   const borderColor = isDarkMode ? "#1A2233" : "#f3f4f6";
   const bgCard = isDarkMode ? "#151C2B" : "#f3f4f6";
   const pointColor = isDarkMode ? "#4F8BFF" : "#6F91BC";
-  const badgeBg = isDarkMode ? "#1A62FF33" : undefined;
-  const badgeText = isDarkMode ? "#8BB3FF" : "#ffffff";
+  // 상태별 배지 정보
+  const getStatusBadge = () => {
+    const statusMap: Record<string, { label: string; color: string }> = {
+      open: { label: "모집중", color: isDarkMode ? "#6F91BC" : "#8BA3C3" },
+      recruiting: { label: "모집중", color: isDarkMode ? "#6F91BC" : "#8BA3C3" },
+      closed: { label: "모집완료", color: isDarkMode ? "#A8B5C8" : "#B8C5D8" },
+      in_progress: { label: "진행중", color: isDarkMode ? "#7A9BC4" : "#9BB3D1" },
+      completed: { label: "거래완료", color: isDarkMode ? "#8FA8C0" : "#A5B8D0" },
+    };
+    
+    return statusMap[status] || statusMap.open;
+  };
+
+  const statusBadge = getStatusBadge();
+  const badgeText = "#ffffff";
 
   return (
     <div
@@ -64,21 +118,18 @@ export default function PostCard({
           />
         )}
 
-        {/* 모집중 배지 */}
-        {status === "recruiting" && (
-          <div className="absolute top-2 left-2">
-            <span 
-              className="text-[10px] px-2 py-0.5 rounded-full shadow-sm"
-              style={{ 
-                backgroundColor: isDarkMode ? "#1A62FF33" : undefined,
-                color: badgeText,
-                background: !isDarkMode ? "linear-gradient(to right, #6F91BC, #8BA3C3)" : "#1A62FF33"
-              }}
-            >
-              모집중
-            </span>
-          </div>
-        )}
+        {/* 상태 배지 */}
+        <div className="absolute top-2 left-2">
+          <span 
+            className="text-[10px] px-2 py-0.5 rounded-full shadow-sm"
+            style={{ 
+              backgroundColor: statusBadge.color,
+              color: badgeText
+            }}
+          >
+            {statusBadge.label}
+          </span>
+        </div>
       </div>
 
       {/* 게시글 정보 */}
@@ -102,6 +153,20 @@ export default function PostCard({
               <span style={{ color: textTertiary }}>
                 {currentPeople}/{maxPeople}명 참여
               </span>
+              <button
+                onClick={handleHeartClick}
+                disabled={favoriteLoading}
+                className="ml-auto p-1 transition-opacity disabled:opacity-50"
+                style={{ color: isFavorite ? "#ef4444" : textTertiary }}
+              >
+                <Heart 
+                  className="w-4 h-4" 
+                  style={{ 
+                    color: isFavorite ? "#ef4444" : textTertiary,
+                    fill: isFavorite ? "#ef4444" : "none"
+                  }} 
+                />
+              </button>
             </div>
 
             {/* 진행률 바 */}

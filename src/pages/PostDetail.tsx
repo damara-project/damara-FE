@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, MapPin, Trash2, ImageOff, Pencil, X, Check, ChevronDown, Heart } from "lucide-react";
+import { ArrowLeft, Users, MapPin, Trash2, ImageOff, Pencil, X, Check, ChevronDown, Heart, MessageCircle } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { getPostDetail, deletePost, updatePost, checkParticipation, participatePost, cancelParticipation, addFavorite, checkFavorite, removeFavorite, updatePostStatus } from "../apis/posts";
+import { getChatRoomByPostId } from "../apis/chat";
 import { useTheme } from "../contexts/ThemeContext";
 
 export default function PostDetail() {
@@ -47,6 +48,9 @@ export default function PostDetail() {
   // 상태 변경 로딩
   const [statusLoading, setStatusLoading] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  
+  // 채팅방 열기
+  const [openingChat, setOpeningChat] = useState(false);
 
   // 현재 로그인한 사용자 ID
   const currentUserId = localStorage.getItem("userId");
@@ -269,12 +273,12 @@ export default function PostDetail() {
     }
   };
 
-  // 상태 목록 정의
+  // 상태 목록 정의 (파스텔톤 색상)
   const statusList = [
-    { value: "open", label: "모집중", color: isDarkMode ? "#4F8BFF" : "#1A2F4A" },
-    { value: "closed", label: "모집완료", color: "#f59e0b" },
-    { value: "in_progress", label: "진행중", color: "#8b5cf6" },
-    { value: "completed", label: "거래완료", color: "#22c55e" },
+    { value: "open", label: "모집중", color: isDarkMode ? "#6F91BC" : "#8BA3C3" },
+    { value: "closed", label: "모집완료", color: isDarkMode ? "#A8B5C8" : "#B8C5D8" },
+    { value: "in_progress", label: "진행중", color: isDarkMode ? "#7A9BC4" : "#9BB3D1" },
+    { value: "completed", label: "거래완료", color: isDarkMode ? "#8FA8C0" : "#A5B8D0" },
   ];
 
   // 현재 상태의 라벨과 색상 가져오기
@@ -292,13 +296,51 @@ export default function PostDetail() {
       setPost((prev: any) => ({ ...prev, status: newStatus }));
     } catch (err: any) {
       console.error("상태 변경 실패:", err);
+      console.error("에러 응답:", err.response?.data);
+      
       if (err.response?.status === 403) {
         alert("작성자만 상태를 변경할 수 있습니다.");
+      } else if (err.response?.status === 400) {
+        const errorMessage = err.response?.data?.error || err.response?.data?.message || "상태 변경이 불가능합니다.";
+        alert(errorMessage);
       } else {
-        alert("상태 변경에 실패했습니다.");
+        const errorMessage = err.response?.data?.error || err.response?.data?.message || "상태 변경에 실패했습니다.";
+        alert(errorMessage);
       }
     } finally {
       setStatusLoading(false);
+    }
+  };
+
+  // 채팅방 열기
+  const handleOpenChat = async () => {
+    if (!id || !currentUserId) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+
+    try {
+      setOpeningChat(true);
+      // Post ID로 채팅방 조회 또는 생성
+      const res = await getChatRoomByPostId(id);
+      console.log("💬 채팅방 조회/생성:", res.data);
+      
+      // 채팅방 ID를 쿼리 파라미터로 전달하여 Chat 페이지로 이동
+      const chatRoomId = res.data.id || res.data.chatRoomId;
+      if (chatRoomId) {
+        nav(`/chat?roomId=${chatRoomId}`);
+      } else {
+        nav("/chat");
+      }
+    } catch (err: any) {
+      console.error("채팅방 열기 실패:", err);
+      if (err.response?.status === 404) {
+        alert("게시글을 찾을 수 없습니다.");
+      } else {
+        alert("채팅방을 열 수 없습니다.");
+      }
+    } finally {
+      setOpeningChat(false);
     }
   };
 
@@ -521,9 +563,6 @@ export default function PostDetail() {
                     {post.currentQuantity ?? 0}/{post.minParticipants ?? 2}명
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Heart className="w-4 h-4" style={{ color: isFavorite ? "#ef4444" : pointColor, fill: isFavorite ? "#ef4444" : "none" }} />
-                </div>
               </div>
             </div>
 
@@ -564,7 +603,7 @@ export default function PostDetail() {
               </div>
             ) : (
               <p className="font-semibold" style={{ color: pointColor }}>
-                1인당 {Number(post.price).toLocaleString()}원
+                1인당 {Math.floor(Number(post.price)).toLocaleString()}원
               </p>
             )}
 
@@ -608,26 +647,28 @@ export default function PostDetail() {
         </div>
       </div>
 
-      {/* 참여/취소 버튼 (본인 게시글이 아닐 때만) */}
+      {/* 하단 버튼 영역 (작성자가 아닐 때만 표시) */}
       {!isOwner && post.status === "open" && (
         <div 
           className="sticky bottom-0 p-4 transition-colors"
           style={{ backgroundColor: bgMain, borderTop: `1px solid ${borderColor}` }}
         >
           {isParticipant ? (
+            // 참여자일 때: 채팅하기 버튼
             <Button
-              onClick={handleCancelParticipation}
-              disabled={participating}
-              className="w-full py-6 rounded-xl hover:bg-red-900/20"
+              onClick={handleOpenChat}
+              disabled={openingChat}
+              className="w-full py-6 rounded-xl transition-colors"
               style={{ 
-                border: '2px solid #E85A59', 
-                color: '#E85A59',
-                backgroundColor: isDarkMode ? "transparent" : "white"
+                backgroundColor: isDarkMode ? "#4F8BFF" : "#1A2F4A",
+                color: "#ffffff"
               }}
             >
-              {participating ? "처리 중..." : "참여 취소"}
+              <MessageCircle className="w-5 h-5 mr-2" />
+              {openingChat ? "열기 중..." : "채팅하기"}
             </Button>
           ) : (
+            // 비참여자일 때: 참여하기 버튼
             <Button
               onClick={handleParticipate}
               disabled={participating}

@@ -84,12 +84,12 @@ export default function MyPosts() {
                 key={post.id}
                 id={post.id}
                 title={post.title}
-                price={`${Number(post.price).toLocaleString()}원`}
+                price={`${Math.floor(Number(post.price)).toLocaleString()}원`}
                 image={post.images?.[0]?.imageUrl || "/placeholder.png"}
                 currentPeople={post.currentQuantity ?? 0}
                 maxPeople={post.minParticipants ?? 2}
                 location={post.pickupLocation || "명지대 캠퍼스"}
-                status={post.status === "open" ? "recruiting" : "closed"}
+                status={post.status || "open"}
                 onClick={() => nav(`/post/${post.id}`)}
                 isDarkMode={isDarkMode}
               />

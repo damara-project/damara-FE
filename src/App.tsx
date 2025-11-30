@@ -12,6 +12,7 @@ import CreatePost from "./pages/CreatePost";
 import PostDetail from "./pages/PostDetail";
 import MyPosts from "./pages/MyPosts";
 import ParticipatedPosts from "./pages/ParticipatedPosts";
+import Favorites from "./pages/Favorites";
 import Settings from "./pages/Settings";
 import FAQ from "./pages/FAQ";
 import MobileFrame from "./layouts/MobileFrame";
@@ -38,6 +39,7 @@ function AppContent() {
         <Route path="/post/:id" element={<PostDetail />} />
         <Route path="/my-posts" element={<MyPosts />} />
         <Route path="/participated" element={<ParticipatedPosts />} />
+        <Route path="/favorites" element={<Favorites />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/faq" element={<FAQ />} />
       </Routes>

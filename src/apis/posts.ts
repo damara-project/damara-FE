@@ -2,10 +2,10 @@ import axiosInstance from "./axiosInstance";
 
 // ===== 게시글 기본 CRUD =====
 
-// 전체 상품 조회 (페이징)
-export const getPosts = (limit = 20, offset = 0) =>
+// 전체 상품 조회 (페이징 및 카테고리 필터링)
+export const getPosts = (limit = 20, offset = 0, category?: string) =>
   axiosInstance.get(`/api/posts`, {
-    params: { limit, offset },
+    params: { limit, offset, ...(category && category !== "all" && { category }) },
   });
 
 // 상품 상세 조회
@@ -110,3 +110,37 @@ export const checkFavorite = (postId: string, userId: string) =>
 // 관심 해제
 export const removeFavorite = (postId: string, userId: string) =>
   axiosInstance.delete(`/api/posts/${postId}/favorite/${userId}`);
+
+// 사용자가 관심 등록한 게시글 목록 조회
+// 여러 가능한 엔드포인트 시도
+export const getFavoritePosts = async (userId: string) => {
+  // 가능한 엔드포인트 목록
+  const endpoints = [
+    `/api/posts/user/${userId}/favorites`,
+    `/api/users/${userId}/favorites`,
+    `/api/favorites/${userId}`,
+  ];
+
+  // 첫 번째 엔드포인트 시도
+  try {
+    return await axiosInstance.get(endpoints[0]);
+  } catch (err: any) {
+    // 404가 아니면 그대로 에러 throw
+    if (err.response?.status !== 404) {
+      throw err;
+    }
+    
+    // 404면 다른 엔드포인트 시도
+    for (let i = 1; i < endpoints.length; i++) {
+      try {
+        return await axiosInstance.get(endpoints[i]);
+      } catch (e: any) {
+        if (i === endpoints.length - 1) {
+          // 마지막 엔드포인트도 실패하면 원래 에러 throw
+          throw err;
+        }
+      }
+    }
+    throw err;
+  }
+};

@@ -1,7 +1,7 @@
 // src/pages/Profile.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, ShoppingBag, Heart, Award, Bell, HelpCircle, ChevronRight, LogOut, Edit3, X, Trash2 } from "lucide-react";
+import { Settings, ShoppingBag, Heart, Award, Bell, HelpCircle, ChevronRight, LogOut, Edit3, X, Trash2, Star } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { getPostsByStudentId, getParticipatedPosts } from "../apis/posts";
 import { updateUser, deleteUser } from "../apis/users";
@@ -319,6 +319,24 @@ export default function Profile() {
             <span className="text-sm" style={{ color: textSecondary }}>{participatedCount}개</span>
             <ChevronRight className="w-5 h-5" style={{ color: textSecondary }} />
           </div>
+        </button>
+
+        {/* 관심목록 */}
+        <button 
+          onClick={() => nav("/favorites")}
+          className="w-full flex items-center justify-between px-4 py-4 transition-all"
+          style={{ borderBottom: `1px solid ${borderColor}` }}
+        >
+          <div className="flex items-center gap-3">
+            <div 
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: isDarkMode ? "#1A2F4A" : "#EEF2F7" }}
+            >
+              <Star className="w-5 h-5" style={{ color: pointColor }} />
+            </div>
+            <span style={{ color: textPrimary }}>관심목록</span>
+          </div>
+          <ChevronRight className="w-5 h-5" style={{ color: textSecondary }} />
         </button>
 
         {/* 신뢰지수 */}

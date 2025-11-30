@@ -63,30 +63,29 @@ export default function Home() {
     }
   }, [showSearch]);
 
-  // 검색 + 카테고리 필터링된 게시글
+  // 검색어 필터링된 게시글 (카테고리는 서버에서 필터링)
   const filteredPosts = posts.filter((post) => {
-    // 검색어 필터링
-    const matchesSearch = searchQuery === "" || 
+    // 검색어 필터링만 클라이언트에서 처리
+    if (searchQuery === "") return true;
+    
+    return (
       post.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.pickupLocation?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    // 카테고리 필터링 (전체면 모든 게시글, 아니면 해당 카테고리만)
-    const matchesCategory = activeCategory === "all" || post.category === activeCategory;
-    
-    return matchesSearch && matchesCategory;
+      post.pickupLocation?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   });
 
   // ===== API 호출 =====
   useEffect(() => {
     const fetchPosts = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await getPosts(); // GET /api/posts
+        // 카테고리 파라미터 전달 (all이면 undefined로 전달하여 전체 조회)
+        const categoryParam = activeCategory === "all" ? undefined : activeCategory;
+        const res = await getPosts(20, 0, categoryParam); // GET /api/posts
         console.log("📦 Posts API 응답:", res.data); // 디버깅용
-        // 각 게시글의 category 확인
-        res.data.forEach((post: any, i: number) => {
-          console.log(`📋 게시글[${i}] "${post.title}" category:`, post.category);
-        });
+        console.log("📂 선택된 카테고리:", activeCategory);
         setPosts(res.data); // 배열 형태 그대로 세팅됨
       } catch (e) {
         setError("게시글을 불러올 수 없습니다.");
@@ -97,7 +96,7 @@ export default function Home() {
     };
 
     fetchPosts();
-  }, []);
+  }, [activeCategory]); // activeCategory가 변경될 때마다 API 호출
 
   // ===== 알림 API 호출 =====
   const userId = localStorage.getItem("userId") || "";
@@ -224,13 +223,12 @@ export default function Home() {
               </div>
             </>
           ) : (
-            /* 검색 모드일 때 */
             <div className="flex items-center gap-3 w-full">
               <div 
-                className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl"
+                className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-200"
                 style={{ 
-                  backgroundColor: isDarkMode ? "#1A2233" : "#f3f4f6",
-                  border: `1px solid ${borderColor}`
+                  backgroundColor: isDarkMode ? "#1A2233" : "#f9fafb",
+                  border: `1px solid ${isDarkMode ? "#1A2233" : "#e5e7eb"}`
                 }}
               >
                 <Search className="w-5 h-5 flex-shrink-0" style={{ color: textSecondary }} />
@@ -240,18 +238,39 @@ export default function Home() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="공동구매 검색..."
-                  className="flex-1 bg-transparent outline-none text-sm"
+                  className="flex-1 bg-transparent outline-none text-[15px] placeholder:text-gray-400 focus:outline-none"
                   style={{ color: textPrimary }}
+                  onFocus={(e) => {
+                    const container = e.currentTarget.parentElement;
+                    if (container) {
+                      container.style.backgroundColor = isDarkMode ? "#1A2233" : "#ffffff";
+                      container.style.borderColor = isDarkMode ? "#4F8BFF" : "#355074";
+                      container.style.boxShadow = isDarkMode 
+                        ? "0 0 0 2px rgba(79, 139, 255, 0.2)" 
+                        : "0 0 0 2px rgba(53, 80, 116, 0.2)";
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const container = e.currentTarget.parentElement;
+                    if (container) {
+                      container.style.backgroundColor = isDarkMode ? "#1A2233" : "#f9fafb";
+                      container.style.borderColor = isDarkMode ? "#1A2233" : "#e5e7eb";
+                      container.style.boxShadow = "none";
+                    }
+                  }}
                 />
                 {searchQuery && (
-                  <button onClick={() => setSearchQuery("")} className="p-1">
+                  <button 
+                    onClick={() => setSearchQuery("")} 
+                    className="p-1 hover:opacity-70 transition-opacity"
+                  >
                     <X className="w-4 h-4" style={{ color: textSecondary }} />
                   </button>
                 )}
               </div>
               <button
                 onClick={() => { setShowSearch(false); setSearchQuery(""); }}
-                className="px-2 py-2 text-sm font-medium"
+                className="px-3 py-2 text-sm font-medium hover:opacity-80 transition-opacity"
                 style={{ color: pointColor }}
               >
                 취소
@@ -333,12 +352,12 @@ export default function Home() {
                 key={post.id}
                 id={post.id}
                 title={post.title}
-                price={`${post.price?.toLocaleString() ?? 0}원`}
+                price={`${Math.floor(post.price ?? 0).toLocaleString()}원`}
                 image={post.images?.[0]?.imageUrl || "/placeholder.png"}
                 currentPeople={post.currentQuantity ?? 0}
                 maxPeople={post.minParticipants ?? 2}
                 location={post.pickupLocation || "명지대 캠퍼스"}
-                status={post.status === "open" ? "recruiting" : "completed"}
+                status={post.status || "open"}
                 onClick={() => nav(`/post/${post.id}`)}
                 isDarkMode={isDarkMode}
               />
