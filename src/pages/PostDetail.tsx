@@ -9,6 +9,7 @@ import { Input } from "../components/ui/input";
 import { getPostDetail, deletePost, updatePost, checkParticipation, participatePost, cancelParticipation, addFavorite, checkFavorite, removeFavorite, updatePostStatus } from "../apis/posts";
 import { getChatRoomByPostId } from "../apis/chat";
 import { useTheme } from "../contexts/ThemeContext";
+import { getImageUrl } from "../utils/imageUrl";
 
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>();
@@ -241,8 +242,8 @@ export default function PostDetail() {
   // 본인 게시글인지 확인
   const isOwner = currentUserId && post?.authorId === currentUserId;
 
-  // 이미지 URL
-  const imageUrl = post?.images?.[0]?.imageUrl || null;
+  // 이미지 URL (HTTPS 변환)
+  const imageUrl = getImageUrl(post?.images?.[0]?.imageUrl);
 
   // 관심 등록/해제 토글
   const toggleFavorite = async () => {

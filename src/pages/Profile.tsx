@@ -7,6 +7,7 @@ import { getPostsByStudentId, getParticipatedPosts } from "../apis/posts";
 import { updateUser, deleteUser } from "../apis/users";
 import { uploadImage } from "../apis/upload";
 import { useTheme } from "../contexts/ThemeContext";
+import { getImageUrl } from "../utils/imageUrl";
 
 export default function Profile() {
   const nav = useNavigate();
@@ -136,7 +137,11 @@ export default function Profile() {
       
       // 이미지 업로드
       const res = await uploadImage(file);
-      const imageUrl = res.url.startsWith("http") ? res.url : res.url;
+      // 이미지 URL 처리 - 상대 경로인 경우 VITE_API_BASE와 결합
+      const apiBase = import.meta.env.VITE_API_BASE || "";
+      const imageUrl = res.url.startsWith("http") 
+        ? res.url.replace("http://", "https://") 
+        : `${apiBase}${res.url.startsWith("/") ? res.url : `/${res.url}`}`;
       
       // 사용자 정보 업데이트
       await updateUser(userId, { avatarUrl: imageUrl });
@@ -202,7 +207,7 @@ export default function Profile() {
           <div className="relative">
             <Avatar className="w-20 h-20 border-4 border-white/20">
               {user?.avatarUrl ? (
-                <AvatarImage src={user.avatarUrl} />
+                <AvatarImage src={getImageUrl(user.avatarUrl)} />
               ) : null}
               <AvatarFallback className="bg-gradient-to-br from-[#6F91BC] to-[#8BA3C3]">
                 <svg className="w-12 h-12 text-white/80" fill="currentColor" viewBox="0 0 24 24">

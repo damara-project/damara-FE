@@ -5,6 +5,7 @@ import { ArrowLeft, Send, MoreVertical, Eye, LogOut } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
+import { getImageUrl } from "../utils/imageUrl";
 import { useTheme } from "../contexts/ThemeContext";
 import { getUserChatRooms, getMessages, sendMessage, markAllMessagesAsRead, getChatRoomById, deleteChatRoom } from "../apis/chat";
 import { useNavigate } from "react-router-dom";
@@ -329,7 +330,7 @@ export default function Chat() {
               <div key={msg.id} className={`flex gap-2 ${isMe ? "flex-row-reverse" : ""}`}>
                 {!isMe && (
                   <Avatar className="w-8 h-8">
-                    <AvatarImage src={msg.sender?.avatarUrl} />
+                    <AvatarImage src={getImageUrl(msg.sender?.avatarUrl)} />
                     <AvatarFallback className="text-white text-xs" style={{ backgroundColor: pointColor }}>
                       {msg.sender?.nickname?.[0] || "?"}
                     </AvatarFallback>

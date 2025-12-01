@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { MapPin, Users, ImageOff, Heart } from "lucide-react";
 import { checkFavorite, addFavorite, removeFavorite } from "../apis/posts";
+import { getImageUrl } from "../utils/imageUrl";
 
 export interface PostCardProps {
   id: number;
@@ -93,6 +94,9 @@ export default function PostCard({
 
   const statusBadge = getStatusBadge();
   const badgeText = "#ffffff";
+  
+  // 이미지 URL 처리 (HTTPS 변환)
+  const processedImageUrl = getImageUrl(image);
 
   return (
     <div
@@ -105,13 +109,13 @@ export default function PostCard({
         className="w-[120px] h-[120px] rounded-xl overflow-hidden flex-shrink-0 relative"
         style={{ backgroundColor: bgCard }}
       >
-        {imgError || !image ? (
+        {imgError || !processedImageUrl || processedImageUrl === "/placeholder.png" ? (
           <div className="w-full h-full flex items-center justify-center">
             <ImageOff className="w-8 h-8" style={{ color: textSecondary }} />
           </div>
         ) : (
           <img
-            src={image}
+            src={processedImageUrl}
             alt={title}
             className="w-full h-full object-cover"
             onError={() => setImgError(true)}
