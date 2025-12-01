@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 
 import { uploadImage } from "../apis/upload";
 import { createPost } from "../apis/posts";
+import { getImageUrl } from "../utils/imageUrl";
 
 export default function CreatePost() {
   const nav = useNavigate();
@@ -52,11 +53,8 @@ export default function CreatePost() {
       const res = await uploadImage(file); // { url: "/uploads/...", filename: "..." }
       console.log("📷 이미지 업로드 응답:", res); // 디버깅용
       
-      // 이미지 URL 처리 - 상대 경로인 경우 VITE_API_BASE와 결합
-      const apiBase = import.meta.env.VITE_API_BASE || "";
-      const imageUrl = res.url.startsWith("http") 
-        ? res.url.replace("http://", "https://") 
-        : `${apiBase}${res.url.startsWith("/") ? res.url : `/${res.url}`}`;
+      // 이미지 URL 처리 - getImageUrl 함수 사용 (EC2 IP 자동 변환 포함)
+      const imageUrl = getImageUrl(res.url);
       console.log("📷 완성된 이미지 URL:", imageUrl);
       
       // 업로드 성공 시 URL 업데이트

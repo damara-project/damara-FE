@@ -1,14 +1,35 @@
 /**
  * 이미지 URL을 HTTPS로 변환하는 유틸리티 함수
  * 상대 경로인 경우 VITE_API_BASE를 사용하여 전체 URL로 변환
+ * EC2 IP가 포함된 URL은 Cloudflare Tunnel 주소로 변환
  */
 export const getImageUrl = (imagePath: string | null | undefined): string => {
   if (!imagePath) {
     return "/placeholder.png";
   }
 
-  // 이미 전체 URL인 경우 그대로 반환
+  // 이미 전체 URL인 경우
   if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+    // EC2 IP 주소가 포함된 경우 Cloudflare Tunnel 주소로 변환
+    if (imagePath.includes("3.38.145.117") || imagePath.includes("ec2-")) {
+      const apiBase = import.meta.env.VITE_API_BASE || "";
+      // URL에서 경로 부분만 추출
+      try {
+        const url = new URL(imagePath);
+        const path = url.pathname;
+        return `${apiBase}${path}`;
+      } catch {
+        // URL 파싱 실패 시 경로만 추출 시도
+        const pathMatch = imagePath.match(/\/uploads\/.*/);
+        if (pathMatch) {
+          return `${apiBase}${pathMatch[0]}`;
+        }
+        // 경로를 찾을 수 없으면 상대 경로로 처리
+        const cleanPath = imagePath.replace(/^https?:\/\/[^\/]+/, "");
+        return `${apiBase}${cleanPath}`;
+      }
+    }
+    
     // HTTP를 HTTPS로 변환 (Mixed Content 방지)
     if (imagePath.startsWith("http://")) {
       return imagePath.replace("http://", "https://");
