@@ -1,8 +1,8 @@
 import axios from "axios";
 
-export const axiosInstance = axios.create({
-  baseURL: "/api",
-  withCredentials: true, // 로그인 기능을 위해 유지
+const axiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+  withCredentials: true,
 });
 
   // 요청 인터셉터
@@ -27,4 +27,4 @@ export const axiosInstance = axios.create({
     }
   );
 
-  export default axiosInstance;
+export default axiosInstance;

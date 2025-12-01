@@ -19,8 +19,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // EC2 백엔드 URL (환경변수에서 가져오거나 기본값 사용)
-  const BACKEND_URL = process.env.VITE_API_URL || process.env.BACKEND_URL || 'http://3.38.145.117:3000';
+  // 백엔드 URL (환경변수에서 가져오기)
+  const BACKEND_URL = process.env.VITE_API_URL || process.env.BACKEND_URL;
+  
+  if (!BACKEND_URL) {
+    return res.status(500).json({
+      error: '백엔드 URL이 설정되지 않았습니다.',
+      message: 'VITE_API_URL 또는 BACKEND_URL 환경변수를 설정해주세요.',
+    });
+  }
   
   // 요청 경로 구성 - Vercel의 동적 라우팅 처리
   let path = '';
@@ -32,7 +39,8 @@ export default async function handler(req, res) {
     }
   }
   
-  const apiPath = path ? `/api/${path}` : '/api';
+  // BACKEND_URL에 이미 /api가 포함되어 있으므로 path만 추가
+  const apiPath = path ? `/${path}` : '';
   
   // 쿼리 파라미터 구성 (path 제외)
   const queryParams = Object.keys(req.query)

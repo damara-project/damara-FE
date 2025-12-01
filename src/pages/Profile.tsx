@@ -136,8 +136,7 @@ export default function Profile() {
       
       // 이미지 업로드
       const res = await uploadImage(file);
-      const baseUrl = "http://3.38.145.117:3000";
-      const imageUrl = res.url.startsWith("http") ? res.url : `${baseUrl}${res.url}`;
+      const imageUrl = res.url.startsWith("http") ? res.url : res.url;
       
       // 사용자 정보 업데이트
       await updateUser(userId, { avatarUrl: imageUrl });
