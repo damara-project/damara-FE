@@ -38,8 +38,10 @@ export const updatePost = (
     deadline?: string;
     pickupLocation?: string;
     images?: string[];
+    minParticipants?: number;
+    category?: string;
   }
-) => axiosInstance.put(`/posts/${id}`, data);
+) => axiosInstance.put(`/posts/${id}`, { post: data });
 
 // 상품 삭제
 export const deletePost = (id: string) =>

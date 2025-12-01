@@ -9,6 +9,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={isDarkMode ? "dark" : "light"}
       className="toaster group"
       position="top-center"
+      duration={2000}
       {...props}
     />
   );

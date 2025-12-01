@@ -415,7 +415,7 @@ export default function Settings() {
             </div>
 
             {/* 옵션들 */}
-            <div className="p-2">
+            <div className="px-4 pt-4 pb-2 space-y-1">
               {(["small", "medium", "large"] as FontSize[]).map((size) => (
                 <button
                   key={size}
@@ -423,44 +423,44 @@ export default function Settings() {
                     setFontSize(size);
                     setShowFontModal(false);
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors"
                   style={{ 
-                    backgroundColor: fontSize === size ? "rgba(111, 145, 188, 0.1)" : "transparent"
+                    backgroundColor: fontSize === size 
+                      ? (isDarkMode ? "rgba(111, 145, 188, 0.15)" : "rgba(111, 145, 188, 0.1)")
+                      : "transparent"
                   }}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <span 
-                      className="text-xs"
-                      style={{ 
-                        color: textPrimary,
-                        fontSize: size === "small" ? "12px" : size === "large" ? "16px" : "14px"
-                      }}
-                    >
-                      {fontSizeLabels[size]}
-                    </span>
-                    <span className="text-[10px]" style={{ color: textSecondary }}>
-                      {size === "small" ? "14px" : size === "large" ? "18px" : "16px"}
-                    </span>
-                  </div>
+                  <span 
+                    style={{ 
+                      color: textPrimary,
+                      fontSize: size === "small" ? "14px" : size === "large" ? "18px" : "16px",
+                      fontWeight: fontSize === size ? "500" : "400"
+                    }}
+                  >
+                    {fontSizeLabels[size]} {size === "small" ? "14px" : size === "large" ? "18px" : "16px"}
+                  </span>
                   {fontSize === size && (
-                    <Check className="w-4 h-4 text-[#6F91BC]" />
+                    <Check className="w-5 h-5" style={{ color: pointColor }} />
                   )}
                 </button>
               ))}
             </div>
 
             {/* 미리보기 */}
-            <div className="px-4 pb-4">
+            <div className="px-4 pt-4 pb-6 border-t" style={{ borderColor: borderColor }}>
+              <p className="text-xs mb-4" style={{ color: textSecondary }}>미리보기</p>
               <div 
-                className="p-2.5 rounded-xl"
-                style={{ backgroundColor: bgIcon }}
+                className="p-4 rounded-lg"
+                style={{ 
+                  backgroundColor: bgIcon,
+                  border: `1px solid ${borderColor}`
+                }}
               >
-                <p className="text-[10px] mb-1.5" style={{ color: textSecondary }}>미리보기</p>
                 <p 
-                  className="text-xs"
                   style={{ 
                     color: textPrimary,
-                    fontSize: fontSize === "small" ? "12px" : fontSize === "large" ? "16px" : "14px" 
+                    fontSize: fontSize === "small" ? "14px" : fontSize === "large" ? "18px" : "16px",
+                    lineHeight: "1.6"
                   }}
                 >
                   Damara 공동구매 플랫폼

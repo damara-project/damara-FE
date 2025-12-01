@@ -1,10 +1,11 @@
 // src/pages/ParticipatedPosts.tsx
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import PostCard from "../components/PostCard";
-import { getParticipatedPosts } from "../apis/posts";
+import { getParticipatedPosts, getPostDetail } from "../apis/posts";
 import { useTheme } from "../contexts/ThemeContext";
+import { getImageUrl } from "../utils/imageUrl";
 
 export default function ParticipatedPosts() {
   const nav = useNavigate();
@@ -35,7 +36,37 @@ export default function ParticipatedPosts() {
         console.log("📦 참여한 게시글 data:", res.data);
         // 응답 구조에 따라 처리
         const postsData = res.data?.posts || res.data || [];
-        setPosts(Array.isArray(postsData) ? postsData : []);
+        console.log("📦 처리된 게시글 데이터:", postsData);
+        
+        // 각 게시글의 상세 정보를 가져와서 images 포함
+        const postsWithDetails = await Promise.all(
+          postsData.map(async (item: any) => {
+            const post = item.post || item;
+            const postId = post.id || post.postid;
+            
+            if (postId) {
+              try {
+                // 게시글 상세 정보 가져오기 (images 포함)
+                const detailRes = await getPostDetail(postId);
+                const fullPost = detailRes.data;
+                console.log(`📦 게시글 ${postId} 상세 정보:`, fullPost);
+                return {
+                  ...item,
+                  post: {
+                    ...post,
+                    ...fullPost, // 상세 정보로 덮어쓰기 (images 포함)
+                  }
+                };
+              } catch (err) {
+                console.error(`게시글 ${postId} 상세 정보 가져오기 실패:`, err);
+                return item; // 실패 시 원본 데이터 반환
+              }
+            }
+            return item;
+          })
+        );
+        
+        setPosts(Array.isArray(postsWithDetails) ? postsWithDetails : []);
       } catch (err) {
         console.error(err);
         setError("게시글을 불러올 수 없습니다.");
@@ -84,14 +115,35 @@ export default function ParticipatedPosts() {
             posts.map((item) => {
               // 참여 정보 안에 post 객체가 있음
               const post = item.post || item;
-              console.log("📷 게시글 이미지:", post.images);
+              
+              // 이미지 URL 추출 - 다양한 구조 지원
+              let imageUrl = null;
+              if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+                // images 배열의 첫 번째 항목
+                const firstImage = post.images[0];
+                imageUrl = firstImage.imageUrl || firstImage.url || firstImage || null;
+              } else if (typeof post.images === 'string') {
+                // images가 문자열인 경우
+                imageUrl = post.images;
+              } else if (post.image) {
+                // image 필드가 있는 경우
+                imageUrl = post.image;
+              }
+              
+              const processedImageUrl = getImageUrl(imageUrl);
+              
+              console.log("📷 게시글 전체:", post);
+              console.log("📷 게시글 images 필드:", post.images);
+              console.log("📷 원본 이미지 URL:", imageUrl);
+              console.log("📷 처리된 이미지 URL:", processedImageUrl);
+              
               return (
                 <PostCard
                   key={post.id}
                   id={post.id}
                   title={post.title}
                   price={`${Math.floor(Number(post.price)).toLocaleString()}원`}
-                  image={post.images?.[0]?.imageUrl || "/placeholder.png"}
+                  image={processedImageUrl}
                   currentPeople={post.currentQuantity ?? 0}
                   maxPeople={post.minParticipants ?? 2}
                   location={post.pickupLocation || "명지대 캠퍼스"}

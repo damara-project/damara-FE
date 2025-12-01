@@ -1,8 +1,8 @@
 // src/pages/PostDetail.tsx
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, MapPin, Trash2, ImageOff, Pencil, X, Check, ChevronDown, Heart, MessageCircle, MoreVertical } from "lucide-react";
+import { ArrowLeft, Users, MapPin, Trash2, ImageOff, Pencil, X, Check, ChevronDown, Heart, MessageCircle, MoreVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -41,6 +41,10 @@ export default function PostDetail() {
   const [imgError, setImgError] = useState(false);
   const [isParticipant, setIsParticipant] = useState(false);
   const [participating, setParticipating] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   
   // 수정 모드
   const [isEditing, setIsEditing] = useState(false);
@@ -197,23 +201,66 @@ export default function PostDetail() {
 
     try {
       setSaving(true);
-      const imageUrls = post.images?.map((img: any) => img.imageUrl) || [];
+      // 이미지 URL 처리 - 백엔드가 원하는 형식으로 변환
+      const imageUrls = post.images?.map((img: any) => {
+        const url = img.imageUrl || img.url || "";
+        if (!url) return null;
+        
+        // 전체 URL인 경우 경로만 추출
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+          try {
+            const urlObj = new URL(url);
+            const pathname = urlObj.pathname;
+            // /uploads/로 시작하는 경로만 반환
+            if (pathname.startsWith("/uploads/")) {
+              return pathname;
+            }
+            // 경로에서 /uploads/ 부분 찾기
+            const uploadsIndex = pathname.indexOf("/uploads/");
+            if (uploadsIndex !== -1) {
+              return pathname.substring(uploadsIndex);
+            }
+            // 전체 URL을 그대로 반환 (백엔드가 받을 수도 있음)
+            return url;
+          } catch {
+            // URL 파싱 실패 시 /uploads/로 시작하는 부분만 추출
+            const match = url.match(/\/uploads\/[^?]*/);
+            return match ? match[0] : url;
+          }
+        }
+        // 이미 상대 경로인 경우 그대로 사용
+        return url.startsWith("/") ? url : `/${url}`;
+      }).filter(Boolean) || [];
+      
       // deadline을 ISO 8601 형식으로 변환
       const isoDeadline = new Date(editDeadline).toISOString();
       
-      console.log("📤 수정 데이터:", {
-        title: editTitle,
+      // 원본 이미지 URL 사용 (백엔드가 전체 URL을 받을 수도 있음)
+      const originalImageUrls = post.images?.map((img: any) => img.imageUrl || img.url).filter(Boolean) || [];
+      
+      // 업데이트할 데이터 준비
+      const updateData: any = {
+        title: editTitle.trim(),
         price: Number(editPrice),
         deadline: isoDeadline,
-        images: imageUrls,
-      });
+        images: originalImageUrls.length > 0 ? originalImageUrls : imageUrls,
+        content: post?.content || editTitle.trim() || "",
+        pickupLocation: post?.pickupLocation || "",
+      };
 
-      await updatePost(id, {
-        title: editTitle,
-        price: Number(editPrice),
-        deadline: isoDeadline,
-        images: imageUrls,
-      });
+      // minParticipants와 category가 있으면 포함
+      if (post?.minParticipants !== undefined && post?.minParticipants !== null) {
+        updateData.minParticipants = Number(post.minParticipants);
+      }
+      if (post?.category) {
+        updateData.category = post.category;
+      }
+
+      console.log("📤 최종 수정 데이터:", JSON.stringify(updateData, null, 2));
+      console.log("📤 원본 이미지 URLs:", originalImageUrls);
+      console.log("📤 변환된 이미지 URLs:", imageUrls);
+
+      await updatePost(id, updateData);
       
       // 로컬 상태 업데이트
       setPost((prev: any) => ({
@@ -228,7 +275,9 @@ export default function PostDetail() {
     } catch (err: any) {
       console.error("❌ 수정 에러:", err);
       console.error("❌ 에러 응답:", err.response?.data);
-      toast.error(`수정에 실패했습니다: ${err.response?.data?.error || err.message}`);
+      console.error("❌ 에러 상세:", JSON.stringify(err.response?.data, null, 2));
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message;
+      toast.error(`수정에 실패했습니다: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
@@ -255,8 +304,17 @@ export default function PostDetail() {
   // 본인 게시글인지 확인
   const isOwner = currentUserId && post?.authorId === currentUserId;
 
-  // 이미지 URL (HTTPS 변환)
-  const imageUrl = getImageUrl(post?.images?.[0]?.imageUrl);
+  // 이미지 URL 배열 (HTTPS 변환)
+  const imageUrls = post?.images?.map((img: any) => getImageUrl(img?.imageUrl)).filter(Boolean) || [];
+  const currentImageUrl = imageUrls[currentImageIndex] || null;
+  const hasMultipleImages = imageUrls.length > 1;
+  const isFirstImage = currentImageIndex === 0;
+  const isLastImage = currentImageIndex === imageUrls.length - 1;
+  
+  // 게시글 변경 시 이미지 인덱스 초기화
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [id]);
   
   // 모집 완료 여부 확인
   const isRecruitmentComplete = (post?.currentQuantity ?? 0) >= (post?.minParticipants ?? 2);
@@ -520,20 +578,106 @@ export default function PostDetail() {
       <div className="flex-1 overflow-y-auto">
         {/* 상품 이미지 */}
         <div 
-          className="aspect-square w-full relative overflow-hidden"
+          className="aspect-square w-full relative"
           style={{ backgroundColor: isDarkMode ? "#1A2233" : "#f3f4f6" }}
         >
-          {imgError || !imageUrl ? (
-            <div className="w-full h-full flex items-center justify-center">
+          {imgError || !currentImageUrl ? (
+            <div className="w-full h-full flex items-center justify-center overflow-hidden">
               <ImageOff className="w-16 h-16" style={{ color: textTertiary }} />
             </div>
           ) : (
-            <img
-              src={imageUrl}
-              alt={post.title}
-              className="w-full h-full object-cover"
-              onError={() => setImgError(true)}
-            />
+            <div 
+              className="relative w-full h-full cursor-grab active:cursor-grabbing select-none"
+              style={{ userSelect: "none", WebkitUserSelect: "none" }}
+              onTouchStart={(e) => {
+                setTouchStart(e.targetTouches[0].clientX);
+                setTouchEnd(e.targetTouches[0].clientX);
+              }}
+              onTouchMove={(e) => setTouchEnd(e.targetTouches[0].clientX)}
+              onTouchEnd={() => {
+                if (!touchStart || !touchEnd) return;
+                const distance = touchStart - touchEnd;
+                const isLeftSwipe = distance > 50;
+                const isRightSwipe = distance < -50;
+
+                if (isLeftSwipe && currentImageIndex < imageUrls.length - 1) {
+                  setCurrentImageIndex(currentImageIndex + 1);
+                }
+                if (isRightSwipe && currentImageIndex > 0) {
+                  setCurrentImageIndex(currentImageIndex - 1);
+                }
+                setTouchStart(0);
+                setTouchEnd(0);
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+                setTouchStart(e.clientX);
+                setTouchEnd(e.clientX);
+              }}
+              onMouseMove={(e) => {
+                if (isDragging) {
+                  e.preventDefault();
+                  setTouchEnd(e.clientX);
+                }
+              }}
+              onMouseUp={(e) => {
+                e.preventDefault();
+                if (isDragging) {
+                  if (!touchStart || !touchEnd) {
+                    setIsDragging(false);
+                    return;
+                  }
+                  const distance = touchStart - touchEnd;
+                  const isLeftSwipe = distance > 50;
+                  const isRightSwipe = distance < -50;
+
+                  if (isLeftSwipe && currentImageIndex < imageUrls.length - 1) {
+                    setCurrentImageIndex(currentImageIndex + 1);
+                  }
+                  if (isRightSwipe && currentImageIndex > 0) {
+                    setCurrentImageIndex(currentImageIndex - 1);
+                  }
+                  setIsDragging(false);
+                  setTouchStart(0);
+                  setTouchEnd(0);
+                }
+              }}
+              onMouseLeave={() => {
+                if (isDragging) {
+                  setIsDragging(false);
+                  setTouchStart(0);
+                  setTouchEnd(0);
+                }
+              }}
+            >
+              <div className="w-full h-full overflow-hidden">
+                <img
+                  src={currentImageUrl}
+                  alt={`${post.title} - 이미지 ${currentImageIndex + 1}`}
+                  className="w-full h-full object-cover select-none pointer-events-none"
+                  draggable={false}
+                  onError={() => setImgError(true)}
+                  onDragStart={(e) => e.preventDefault()}
+                />
+              </div>
+              {/* 이미지 인디케이터 */}
+              {imageUrls.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-1.5 z-[9999] pointer-events-none">
+                  {imageUrls.map((_, index) => (
+                    <div
+                      key={index}
+                      className="rounded-full transition-all"
+                      style={{
+                        backgroundColor: index === currentImageIndex ? pointColor : isDarkMode ? "rgba(79, 139, 255, 0.4)" : "rgba(26, 47, 74, 0.4)",
+                        width: index === currentImageIndex ? "6px" : "4px",
+                        height: index === currentImageIndex ? "6px" : "4px"
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
 

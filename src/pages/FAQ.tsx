@@ -1,7 +1,7 @@
 // src/pages/FAQ.tsx
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface FAQItem {
@@ -114,7 +114,7 @@ export default function FAQ() {
       </div>
 
       {/* 추가 문의 안내 */}
-      <div className="mx-4 mt-8 mb-6 p-4 bg-gradient-to-r from-[#1A2F4A] to-[#355074] rounded-2xl">
+      <div className="mx-4 mt-20 mb-6 p-4 bg-gradient-to-r from-[#1A2F4A] to-[#355074] rounded-2xl">
         <p className="text-white font-medium">찾으시는 답변이 없으신가요?</p>
         <p className="text-white/70 text-sm mt-1">
           support@damara.kr로 문의해주세요.
