@@ -176,16 +176,16 @@ export default function Register() {
             />
           </div>
 
-          {/* 닉네임 (필수) */}
+          {/* 이름 (필수) */}
           <div>
             <p className="text-xs text-gray-600 font-medium mb-1">
-              닉네임 <span className="text-red-500">*</span>
+              이름 <span className="text-red-500">*</span>
             </p>
             <input
               type="text"
               value={nickname}
               onChange={(e) => { setNickname(e.target.value); setError(""); }}
-              placeholder="닉네임을 입력하세요"
+              placeholder="이름을 입력하세요"
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-[15px] focus:ring-2 focus:ring-[#355074] focus:bg-white focus:outline-none transition-all"
             />
           </div>
