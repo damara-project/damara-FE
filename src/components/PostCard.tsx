@@ -79,14 +79,14 @@ export default function PostCard({
   const borderColor = isDarkMode ? "#1A2233" : "#f3f4f6";
   const bgCard = isDarkMode ? "#151C2B" : "#f3f4f6";
   const pointColor = isDarkMode ? "#4F8BFF" : "#6F91BC";
-  // 상태별 배지 정보
+  // 상태별 배지 정보 (모집중 색상 기준으로 약간씩 변형)
   const getStatusBadge = () => {
     const statusMap: Record<string, { label: string; color: string }> = {
-      open: { label: "모집중", color: isDarkMode ? "#6F91BC" : "#8BA3C3" },
-      recruiting: { label: "모집중", color: isDarkMode ? "#6F91BC" : "#8BA3C3" },
-      closed: { label: "모집완료", color: isDarkMode ? "#A8B5C8" : "#B8C5D8" },
-      in_progress: { label: "진행중", color: isDarkMode ? "#7A9BC4" : "#9BB3D1" },
-      completed: { label: "거래완료", color: isDarkMode ? "#8FA8C0" : "#A5B8D0" },
+      open: { label: "모집중", color: isDarkMode ? "#5B9BD5" : "#6BA3E8" },
+      recruiting: { label: "모집중", color: isDarkMode ? "#5B9BD5" : "#6BA3E8" },
+      closed: { label: "모집완료", color: isDarkMode ? "#7A9BC4" : "#8BA8D0" },
+      in_progress: { label: "진행중", color: isDarkMode ? "#6BA8C5" : "#7BB8D8" },
+      completed: { label: "거래완료", color: isDarkMode ? "#6BB5C0" : "#7CC5D5" },
     };
     
     return statusMap[status] || statusMap.open;
@@ -95,15 +95,30 @@ export default function PostCard({
   const statusBadge = getStatusBadge();
   const badgeText = "#ffffff";
   
+  // 모집 완료 여부 확인
+  const isRecruitmentComplete = currentPeople >= maxPeople;
+  
   // 이미지 URL 처리 (HTTPS 변환)
   const processedImageUrl = getImageUrl(image);
 
   return (
     <div
       onClick={onClick}
-      className="flex gap-4 py-4 px-4 cursor-pointer transition-all"
-      style={{ borderBottom: `1px solid ${borderColor}` }}
+      className="flex gap-4 py-4 px-4 cursor-pointer transition-all relative"
+      style={{ 
+        borderBottom: `1px solid ${borderColor}`,
+      }}
     >
+      {/* 모집 완료 오버레이 */}
+      {isRecruitmentComplete && (
+        <div 
+          className="absolute inset-0 z-10 backdrop-blur-sm rounded-lg"
+          style={{
+            backgroundColor: isDarkMode ? "rgba(0, 0, 0, 0.2)" : "rgba(255, 255, 255, 0.3)",
+            pointerEvents: "none"
+          }}
+        />
+      )}
       {/* 썸네일 */}
       <div 
         className="w-[120px] h-[120px] rounded-xl overflow-hidden flex-shrink-0 relative"

@@ -550,7 +550,7 @@ export default function Home() {
                   {notifications.map((notification: any) => (
                     <div
                       key={notification.id}
-                      className="p-3 rounded-xl mb-2 transition-colors cursor-pointer hover:opacity-80"
+                      className="p-4 rounded-xl mb-4 transition-colors cursor-pointer hover:opacity-80"
                       style={{ 
                         backgroundColor: !notification.isRead 
                           ? (isDarkMode ? "rgba(79, 139, 255, 0.1)" : "rgba(111, 145, 188, 0.1)") 
@@ -558,7 +558,7 @@ export default function Home() {
                       }}
                       onClick={() => !notification.isRead && handleMarkAsRead(notification.id)}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-4">
                         <div 
                           className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: bgIcon }}
@@ -566,7 +566,7 @@ export default function Home() {
                           <Bell className="w-5 h-5" style={{ color: pointColor }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 mb-2">
                             <span className="font-medium" style={{ color: textPrimary }}>
                               {notification.title}
                             </span>
@@ -576,10 +576,10 @@ export default function Home() {
                               </span>
                             )}
                           </div>
-                          <p className="text-sm mt-1" style={{ color: textSecondary }}>
+                          <p className="text-sm mb-2" style={{ color: textSecondary }}>
                             {notification.message || notification.content}
                           </p>
-                          <p className="text-xs mt-1" style={{ color: textTertiary }}>
+                          <p className="text-xs" style={{ color: textTertiary }}>
                             {notification.createdAt ? new Date(notification.createdAt).toLocaleString('ko-KR') : ''}
                           </p>
                         </div>

@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, MapPin, Trash2, ImageOff, Pencil, X, Check, ChevronDown, Heart, MessageCircle } from "lucide-react";
+import { ArrowLeft, Users, MapPin, Trash2, ImageOff, Pencil, X, Check, ChevronDown, Heart, MessageCircle, MoreVertical } from "lucide-react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { getPostDetail, deletePost, updatePost, checkParticipation, participatePost, cancelParticipation, addFavorite, checkFavorite, removeFavorite, updatePostStatus } from "../apis/posts";
 import { getChatRoomByPostId } from "../apis/chat";
 import { useTheme } from "../contexts/ThemeContext";
@@ -158,6 +164,12 @@ export default function PostDetail() {
     }
   };
 
+  // 게시글 신고
+  const handleReportPost = () => {
+    toast.info("신고 기능은 준비 중입니다.");
+    // TODO: 게시글 신고 API 구현
+  };
+
   // 수정 모드 시작
   const startEditing = () => {
     setEditTitle(post.title || "");
@@ -245,6 +257,9 @@ export default function PostDetail() {
 
   // 이미지 URL (HTTPS 변환)
   const imageUrl = getImageUrl(post?.images?.[0]?.imageUrl);
+  
+  // 모집 완료 여부 확인
+  const isRecruitmentComplete = (post?.currentQuantity ?? 0) >= (post?.minParticipants ?? 2);
 
   // 관심 등록/해제 토글
   const toggleFavorite = async () => {
@@ -275,12 +290,12 @@ export default function PostDetail() {
     }
   };
 
-  // 상태 목록 정의 (파스텔톤 색상)
+  // 상태 목록 정의 (모집중 색상 기준으로 약간씩 변형)
   const statusList = [
-    { value: "open", label: "모집중", color: isDarkMode ? "#6F91BC" : "#8BA3C3" },
-    { value: "closed", label: "모집완료", color: isDarkMode ? "#A8B5C8" : "#B8C5D8" },
-    { value: "in_progress", label: "진행중", color: isDarkMode ? "#7A9BC4" : "#9BB3D1" },
-    { value: "completed", label: "거래완료", color: isDarkMode ? "#8FA8C0" : "#A5B8D0" },
+    { value: "open", label: "모집중", color: isDarkMode ? "#5B9BD5" : "#6BA3E8" },
+    { value: "closed", label: "모집완료", color: isDarkMode ? "#7A9BC4" : "#8BA8D0" },
+    { value: "in_progress", label: "진행중", color: isDarkMode ? "#6BA8C5" : "#7BB8D8" },
+    { value: "completed", label: "거래완료", color: isDarkMode ? "#6BB5C0" : "#7CC5D5" },
   ];
 
   // 현재 상태의 라벨과 색상 가져오기
@@ -409,28 +424,74 @@ export default function PostDetail() {
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+              className="p-2 rounded-lg transition disabled:opacity-50"
+              style={{ color: textSecondary }}
             >
               <Trash2 className="w-5 h-5" />
             </button>
           </div>
         )}
 
-        {/* 본인 게시글이 아니면 관심(하트) 버튼 표시 */}
+        {/* 본인 게시글이 아니면 관심(하트) 버튼 + 케밥 메뉴 표시 */}
         {!isOwner && !isEditing && (
-          <button
-            onClick={toggleFavorite}
-            disabled={favoriteLoading}
-            className="p-2 rounded-lg transition hover:scale-110 disabled:opacity-50"
-          >
-            <Heart 
-              className={`w-6 h-6 transition-colors ${favoriteLoading ? "animate-pulse" : ""}`}
-              style={{ 
-                color: isFavorite ? "#ef4444" : textSecondary,
-                fill: isFavorite ? "#ef4444" : "none"
-              }} 
-            />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleFavorite}
+              disabled={favoriteLoading}
+              className="p-2 rounded-lg transition hover:scale-110 disabled:opacity-50"
+            >
+              <Heart 
+                className={`w-6 h-6 transition-colors ${favoriteLoading ? "animate-pulse" : ""}`}
+                style={{ 
+                  color: isFavorite ? "#ef4444" : textSecondary,
+                  fill: isFavorite ? "#ef4444" : "none"
+                }} 
+              />
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="p-2 rounded-lg transition hover:opacity-80"
+                  style={{
+                    backgroundColor: "transparent",
+                    color: textSecondary,
+                    border: "none"
+                  }}
+                >
+                  <MoreVertical className="w-6 h-6" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="bottom"
+                align="end"
+                sideOffset={8}
+                className="!z-[9999]"
+                style={{
+                  backgroundColor: bgCard,
+                  borderColor: borderColor,
+                  color: textPrimary,
+                  zIndex: 9999
+                }}
+              >
+                {isParticipant && (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={handleCancelParticipation}
+                    style={{ color: "#ef4444" }}
+                  >
+                    참여 취소
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onClick={handleReportPost}
+                  style={{ color: textPrimary }}
+                >
+                  게시글 신고
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
         
         {/* 수정 모드일 때 저장/취소 버튼 */}
@@ -459,7 +520,7 @@ export default function PostDetail() {
       <div className="flex-1 overflow-y-auto">
         {/* 상품 이미지 */}
         <div 
-          className="aspect-square w-full"
+          className="aspect-square w-full relative overflow-hidden"
           style={{ backgroundColor: isDarkMode ? "#1A2233" : "#f3f4f6" }}
         >
           {imgError || !imageUrl ? (
@@ -487,7 +548,7 @@ export default function PostDetail() {
                   <button
                     onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                     disabled={statusLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 whitespace-nowrap"
                     style={{
                       backgroundColor: currentStatus.color,
                       color: "#ffffff"
@@ -495,7 +556,7 @@ export default function PostDetail() {
                   >
                     <span className="text-xs font-medium">{currentStatus.label}</span>
                     <ChevronDown 
-                      className={`w-3.5 h-3.5 transition-transform ${showStatusDropdown ? "rotate-180" : ""}`} 
+                      className={`w-3.5 h-3.5 transition-transform flex-shrink-0 ${showStatusDropdown ? "rotate-180" : ""}`} 
                     />
                   </button>
                   
@@ -508,7 +569,7 @@ export default function PostDetail() {
                         onClick={() => setShowStatusDropdown(false)}
                       />
                       <div 
-                        className="absolute top-full left-0 mt-2 min-w-[140px] rounded-xl shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-top-2 duration-200"
+                        className="absolute top-full left-0 mt-2 min-w-[120px] rounded-xl shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-top-2 duration-200"
                         style={{ 
                           backgroundColor: bgCard, 
                           border: `1px solid ${borderColor}`,
@@ -522,7 +583,7 @@ export default function PostDetail() {
                             key={status.value}
                             onClick={() => handleStatusChange(status.value)}
                             disabled={statusLoading || post.status === status.value}
-                            className="w-full px-4 py-3 text-sm text-left flex items-center gap-3 transition-colors disabled:opacity-40"
+                            className="w-full px-3 py-2 text-xs text-left flex items-center gap-2 transition-colors disabled:opacity-40 whitespace-nowrap"
                             style={{ 
                               color: textPrimary,
                               backgroundColor: post.status === status.value 
@@ -531,14 +592,14 @@ export default function PostDetail() {
                             }}
                           >
                             <span 
-                              className="w-2.5 h-2.5 rounded-full"
+                              className="w-2 h-2 rounded-full flex-shrink-0"
                               style={{ backgroundColor: status.color }}
                             />
                             <span className={post.status === status.value ? "font-medium" : ""}>
                               {status.label}
                             </span>
                             {post.status === status.value && (
-                              <Check className="w-4 h-4 ml-auto" style={{ color: pointColor }} />
+                              <Check className="w-3.5 h-3.5 ml-auto flex-shrink-0" style={{ color: pointColor }} />
                             )}
                           </button>
                         ))}
@@ -670,7 +731,7 @@ export default function PostDetail() {
               {openingChat ? "열기 중..." : "채팅하기"}
             </Button>
           ) : (
-            // 비참여자일 때: 참여하기 버튼 (모집 완료 시 비활성화)
+            // 비참여자일 때: 참여하기 버튼
             (() => {
               const isRecruitmentComplete = (post.currentQuantity ?? 0) >= (post.minParticipants ?? 2);
               return (

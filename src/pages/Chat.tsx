@@ -7,7 +7,8 @@ import { Button } from "../components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { getImageUrl } from "../utils/imageUrl";
 import { useTheme } from "../contexts/ThemeContext";
-import { getUserChatRooms, getMessages, sendMessage, markAllMessagesAsRead, getChatRoomById, deleteChatRoom } from "../apis/chat";
+import { getUserChatRooms, getMessages, sendMessage, markAllMessagesAsRead, getChatRoomById, deleteChatRoom, getChatRoomByPostId } from "../apis/chat";
+import { getPostsByStudentId } from "../apis/posts";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -66,11 +67,12 @@ export default function Chat() {
     }
     
     try {
+      // 1. 사용자가 참여한 채팅방 목록 조회
       const res = await getUserChatRooms(currentUserId);
       console.log("💬 채팅방 목록:", res.data);
       
       // API 응답 형식에 맞게 변환
-      const rooms = (res.data.chatRooms || []).map((room: any) => ({
+      let rooms = (res.data.chatRooms || []).map((room: any) => ({
         id: room.id,
         postId: room.postId,
         post: room.post,
@@ -80,6 +82,77 @@ export default function Chat() {
           : "",
         unreadCount: room.unreadCount || 0,
       }));
+
+      // 2. 사용자가 게시자인 게시글들의 채팅방도 조회
+      try {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          const myPostsRes = await getPostsByStudentId(user.studentId || user.id);
+          const myPosts = myPostsRes.data || [];
+          
+          // 각 게시글에 대해 채팅방이 있는지 확인
+          const authorRooms = await Promise.all(
+            myPosts.map(async (post: any) => {
+              try {
+                const chatRoomRes = await getChatRoomByPostId(post.id);
+                const chatRoom = chatRoomRes.data;
+                const chatRoomId = chatRoom.id || chatRoom.chatRoomId;
+                
+                // 이미 목록에 있는 채팅방인지 확인
+                const existingRoom = rooms.find((r: any) => r.id === chatRoomId || r.postId === post.id);
+                if (existingRoom) {
+                  return null; // 이미 있으면 제외
+                }
+                
+                // 마지막 메시지 가져오기
+                let lastMessage = chatRoom.lastMessage?.content || "";
+                let lastMessageTime = "";
+                let unreadCount = 0;
+                
+                try {
+                  const messagesRes = await getMessages(chatRoomId, 1, 0);
+                  const messages = messagesRes.data.messages || messagesRes.data || [];
+                  if (messages.length > 0) {
+                    const latestMsg = messages[0];
+                    lastMessage = latestMsg.content || "";
+                    lastMessageTime = latestMsg.createdAt 
+                      ? new Date(latestMsg.createdAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+                      : "";
+                    
+                    // 읽지 않은 메시지 수 계산 (게시자가 보낸 메시지 제외)
+                    unreadCount = messages.filter((msg: Message) => 
+                      !msg.isRead && msg.senderId !== currentUserId
+                    ).length;
+                  }
+                } catch (msgErr) {
+                  console.error("메시지 조회 실패:", msgErr);
+                  // 메시지 조회 실패해도 채팅방은 추가
+                }
+                
+                return {
+                  id: chatRoomId,
+                  postId: post.id,
+                  post: { id: post.id, title: post.title, authorId: post.authorId || post.userId },
+                  lastMessage,
+                  lastMessageTime,
+                  unreadCount,
+                };
+              } catch (err) {
+                // 채팅방이 없으면 무시 (아직 메시지가 없을 수 있음)
+                return null;
+              }
+            })
+          );
+          
+          // null 제거하고 기존 목록에 추가
+          const validAuthorRooms = authorRooms.filter((room): room is ChatRoom => room !== null);
+          rooms = [...rooms, ...validAuthorRooms];
+        }
+      } catch (err) {
+        console.error("게시자인 게시글의 채팅방 조회 실패:", err);
+        // 실패해도 기존 목록은 유지
+      }
       
       setChatRooms(rooms);
       
@@ -140,7 +213,18 @@ export default function Chat() {
       try {
         const res = await getMessages(selectedRoom.id);
         console.log("📨 메시지 목록:", res.data);
-        setMessages(res.data.messages || res.data || []);
+        let loadedMessages = res.data.messages || res.data || [];
+        
+        // 게시자가 보낸 메시지는 자동으로 읽음 처리
+        const isAuthor = selectedRoom.post?.authorId === currentUserId;
+        if (isAuthor) {
+          loadedMessages = loadedMessages.map((msg: Message) => ({
+            ...msg,
+            isRead: msg.senderId === currentUserId ? true : msg.isRead
+          }));
+        }
+        
+        setMessages(loadedMessages);
         if (currentUserId) {
           try {
             await markAllMessagesAsRead(selectedRoom.id, currentUserId);
@@ -159,7 +243,17 @@ export default function Chat() {
     const interval = setInterval(() => {
       if (selectedRoom && currentUserId) {
         getMessages(selectedRoom.id).then((res) => {
-          const newMessages = res.data.messages || res.data || [];
+          let newMessages = res.data.messages || res.data || [];
+          
+          // 게시자가 보낸 메시지는 자동으로 읽음 처리
+          const isAuthor = selectedRoom.post?.authorId === currentUserId;
+          if (isAuthor) {
+            newMessages = newMessages.map((msg: Message) => ({
+              ...msg,
+              isRead: msg.senderId === currentUserId ? true : msg.isRead
+            }));
+          }
+          
           setMessages((prev) => {
             // 새 메시지가 있는지 확인
             const prevIds = new Set(prev.map((m: Message) => m.id));
@@ -197,11 +291,46 @@ export default function Chat() {
       setSending(true);
       const res = await sendMessage({ chatRoomId: selectedRoom.id, senderId: currentUserId, content: newMessage, messageType: "text" });
       console.log("📤 메시지 전송 성공:", res.data);
-      setMessages((prev) => [...prev, { id: res.data?.id || Date.now().toString(), chatRoomId: selectedRoom.id, senderId: currentUserId, content: newMessage, messageType: "text", isRead: false, createdAt: new Date().toISOString() }]);
+      
+      // 게시자가 보낸 메시지는 자동으로 읽음 처리
+      const isAuthor = selectedRoom.post?.authorId === currentUserId;
+      const newMsg = { 
+        id: res.data?.id || Date.now().toString(), 
+        chatRoomId: selectedRoom.id, 
+        senderId: currentUserId, 
+        content: newMessage, 
+        messageType: "text", 
+        isRead: isAuthor ? true : (res.data?.isRead ?? false), // 게시자가 보낸 메시지는 읽음 처리
+        createdAt: res.data?.createdAt || new Date().toISOString() 
+      };
+      
+      setMessages((prev) => [...prev, newMsg]);
       setNewMessage("");
+      
+      // 채팅방 목록의 마지막 메시지 업데이트
+      setChatRooms((prevRooms) =>
+        prevRooms.map((room) =>
+          room.id === selectedRoom.id
+            ? {
+                ...room,
+                lastMessage: newMessage,
+                lastMessageTime: formatTime(newMsg.createdAt),
+              }
+            : room
+        )
+      );
     } catch (err) {
       console.error("메시지 전송 실패 (로컬 추가):", err);
-      setMessages((prev) => [...prev, { id: Date.now().toString(), chatRoomId: selectedRoom.id, senderId: currentUserId, content: newMessage, messageType: "text", isRead: false, createdAt: new Date().toISOString() }]);
+      const isAuthor = selectedRoom.post?.authorId === currentUserId;
+      setMessages((prev) => [...prev, { 
+        id: Date.now().toString(), 
+        chatRoomId: selectedRoom.id, 
+        senderId: currentUserId, 
+        content: newMessage, 
+        messageType: "text", 
+        isRead: isAuthor ? true : false, // 게시자가 보낸 메시지는 읽음 처리
+        createdAt: new Date().toISOString() 
+      }]);
       setNewMessage("");
     } finally {
       setSending(false);
