@@ -8,6 +8,7 @@ import { updateUser, deleteUser } from "../apis/users";
 import { uploadImage } from "../apis/upload";
 import { useTheme } from "../contexts/ThemeContext";
 import { getImageUrl } from "../utils/imageUrl";
+import { toast } from "sonner";
 
 export default function Profile() {
   const nav = useNavigate();
@@ -93,10 +94,10 @@ export default function Profile() {
   // 프로필 수정 저장
   const handleUpdateProfile = async () => {
     const userId = localStorage.getItem("userId");
-    if (!userId) return alert("로그인이 필요합니다.");
+    if (!userId) return toast.error("로그인이 필요합니다.");
 
     if (!editNickname.trim()) {
-      return alert("닉네임을 입력해주세요.");
+      return toast.error("닉네임을 입력해주세요.");
     }
 
     try {
@@ -112,10 +113,10 @@ export default function Profile() {
       setUser(updatedUser);
 
       setShowEditModal(false);
-      alert("프로필이 수정되었습니다.");
+      toast.success("프로필이 수정되었습니다.");
     } catch (err: any) {
       console.error("프로필 수정 실패:", err);
-      alert(err.response?.data?.message || "프로필 수정에 실패했습니다.");
+      toast.error(err.response?.data?.message || "프로필 수정에 실패했습니다.");
     } finally {
       setUpdating(false);
     }
@@ -128,7 +129,7 @@ export default function Profile() {
 
     const userId = localStorage.getItem("userId");
     if (!userId) {
-      alert("로그인이 필요합니다.");
+      toast.error("로그인이 필요합니다.");
       return;
     }
 
@@ -148,10 +149,10 @@ export default function Profile() {
       setUser(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
       
-      alert("프로필 이미지가 변경되었습니다!");
+      toast.success("프로필 이미지가 변경되었습니다!");
     } catch (err) {
       console.error("프로필 이미지 업로드 실패:", err);
-      alert("프로필 이미지 업로드에 실패했습니다.");
+      toast.error("프로필 이미지 업로드에 실패했습니다.");
     } finally {
       setUploadingImage(false);
     }
@@ -160,7 +161,7 @@ export default function Profile() {
   // 회원 탈퇴
   const handleDeleteAccount = async () => {
     const userId = localStorage.getItem("userId");
-    if (!userId) return alert("로그인이 필요합니다.");
+    if (!userId) return toast.error("로그인이 필요합니다.");
 
     if (!confirm("정말 탈퇴하시겠습니까?\n\n등록한 게시글과 참여 정보가 모두 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.")) {
       return;
@@ -175,11 +176,11 @@ export default function Profile() {
       await deleteUser(userId);
       localStorage.removeItem("user");
       localStorage.removeItem("userId");
-      alert("회원 탈퇴가 완료되었습니다.\n이용해 주셔서 감사합니다.");
+      toast.success("회원 탈퇴가 완료되었습니다. 이용해 주셔서 감사합니다.");
       nav("/login");
     } catch (err: any) {
       console.error("회원 탈퇴 실패:", err);
-      alert(err.response?.data?.message || "회원 탈퇴에 실패했습니다.");
+      toast.error(err.response?.data?.message || "회원 탈퇴에 실패했습니다.");
     }
   };
 

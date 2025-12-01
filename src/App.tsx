@@ -18,6 +18,7 @@ import FAQ from "./pages/FAQ";
 import MobileFrame from "./layouts/MobileFrame";
 import BottomNav from "./components/BottomNav";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { Toaster } from "./components/ui/sonner";
 
 // BottomNav를 보여줄 페이지 목록
 const SHOW_BOTTOM_NAV_PATHS = ["/home", "/chat", "/profile"];
@@ -46,6 +47,9 @@ function AppContent() {
       
       {/* 로그인 이후 페이지에서만 BottomNav 표시 */}
       {showBottomNav && <BottomNav />}
+      
+      {/* Toast 알림 */}
+      <Toaster />
     </MobileFrame>
   );
 }

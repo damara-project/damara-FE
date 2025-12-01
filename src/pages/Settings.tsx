@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Bell, Moon, Shield, Smartphone, Globe, Info, Check, X, Heart } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTheme } from "../contexts/ThemeContext";
+import { toast } from "sonner";
 
 type FontSize = "small" | "medium" | "large";
 
@@ -223,7 +224,7 @@ export default function Settings() {
         style={{ backgroundColor: bgCard }}
       >
         <button 
-          onClick={() => alert("캐시가 삭제되었습니다.")}
+          onClick={() => toast.success("캐시가 삭제되었습니다.")}
           className="w-full px-4 py-4 text-center text-[#6F91BC] font-medium"
         >
           캐시 삭제

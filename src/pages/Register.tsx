@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { registerUser, loginUser } from "../apis/users";
+import { toast } from "sonner";
 
 export default function Register() {
   const nav = useNavigate();
@@ -64,7 +65,7 @@ export default function Register() {
       } catch (loginErr) {
         // 자동 로그인 실패 시 로그인 페이지로 이동
         console.log("자동 로그인 실패, 로그인 페이지로 이동");
-        alert("회원가입이 완료되었습니다! 로그인해주세요.");
+        toast.success("회원가입이 완료되었습니다! 로그인해주세요.");
         nav("/login");
       }
     } catch (err: any) {

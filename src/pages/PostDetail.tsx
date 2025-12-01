@@ -10,6 +10,7 @@ import { getPostDetail, deletePost, updatePost, checkParticipation, participateP
 import { getChatRoomByPostId } from "../apis/chat";
 import { useTheme } from "../contexts/ThemeContext";
 import { getImageUrl } from "../utils/imageUrl";
+import { toast } from "sonner";
 
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>();
@@ -108,7 +109,7 @@ export default function PostDetail() {
   // 공동구매 참여
   const handleParticipate = async () => {
     if (!id || !currentUserId) {
-      alert("로그인이 필요합니다.");
+      toast.error("로그인이 필요합니다.");
       return;
     }
 
@@ -121,13 +122,13 @@ export default function PostDetail() {
         ...prev,
         currentQuantity: (prev.currentQuantity ?? 0) + 1,
       }));
-      alert("참여가 완료되었습니다!");
+      toast.success("참여가 완료되었습니다!");
     } catch (err: any) {
       console.error(err);
       if (err.response?.status === 400) {
-        alert("이미 참여했거나 작성자는 참여할 수 없습니다.");
+        toast.error("이미 참여했거나 작성자는 참여할 수 없습니다.");
       } else {
-        alert("참여에 실패했습니다.");
+        toast.error("참여에 실패했습니다.");
       }
     } finally {
       setParticipating(false);
@@ -148,10 +149,10 @@ export default function PostDetail() {
         ...prev,
         currentQuantity: Math.max((prev.currentQuantity ?? 1) - 1, 0),
       }));
-      alert("참여가 취소되었습니다.");
+      toast.success("참여가 취소되었습니다.");
     } catch (err) {
       console.error(err);
-      alert("참여 취소에 실패했습니다.");
+      toast.error("참여 취소에 실패했습니다.");
     } finally {
       setParticipating(false);
     }
@@ -178,7 +179,7 @@ export default function PostDetail() {
   const handleSave = async () => {
     if (!id) return;
     if (!editTitle || !editPrice || !editDeadline) {
-      alert("모든 필드를 입력해주세요.");
+      toast.error("모든 필드를 입력해주세요.");
       return;
     }
 
@@ -211,11 +212,11 @@ export default function PostDetail() {
       }));
       
       setIsEditing(false);
-      alert("수정되었습니다!");
+      toast.success("수정되었습니다!");
     } catch (err: any) {
       console.error("❌ 수정 에러:", err);
       console.error("❌ 에러 응답:", err.response?.data);
-      alert(`수정에 실패했습니다: ${err.response?.data?.error || err.message}`);
+      toast.error(`수정에 실패했습니다: ${err.response?.data?.error || err.message}`);
     } finally {
       setSaving(false);
     }
@@ -229,11 +230,11 @@ export default function PostDetail() {
     try {
       setDeleting(true);
       await deletePost(id);
-      alert("게시글이 삭제되었습니다.");
+      toast.success("게시글이 삭제되었습니다.");
       nav("/home");
     } catch (err) {
       console.error(err);
-      alert("삭제에 실패했습니다.");
+      toast.error("삭제에 실패했습니다.");
     } finally {
       setDeleting(false);
     }
@@ -248,7 +249,7 @@ export default function PostDetail() {
   // 관심 등록/해제 토글
   const toggleFavorite = async () => {
     if (!id || !currentUserId) {
-      alert("로그인이 필요합니다.");
+      toast.error("로그인이 필요합니다.");
       return;
     }
 
@@ -300,13 +301,13 @@ export default function PostDetail() {
       console.error("에러 응답:", err.response?.data);
       
       if (err.response?.status === 403) {
-        alert("작성자만 상태를 변경할 수 있습니다.");
+        toast.error("작성자만 상태를 변경할 수 있습니다.");
       } else if (err.response?.status === 400) {
         const errorMessage = err.response?.data?.error || err.response?.data?.message || "상태 변경이 불가능합니다.";
-        alert(errorMessage);
+        toast.error(errorMessage);
       } else {
         const errorMessage = err.response?.data?.error || err.response?.data?.message || "상태 변경에 실패했습니다.";
-        alert(errorMessage);
+        toast.error(errorMessage);
       }
     } finally {
       setStatusLoading(false);
@@ -316,7 +317,7 @@ export default function PostDetail() {
   // 채팅방 열기
   const handleOpenChat = async () => {
     if (!id || !currentUserId) {
-      alert("로그인이 필요합니다.");
+      toast.error("로그인이 필요합니다.");
       return;
     }
 
@@ -336,9 +337,9 @@ export default function PostDetail() {
     } catch (err: any) {
       console.error("채팅방 열기 실패:", err);
       if (err.response?.status === 404) {
-        alert("게시글을 찾을 수 없습니다.");
+        toast.error("게시글을 찾을 수 없습니다.");
       } else {
-        alert("채팅방을 열 수 없습니다.");
+        toast.error("채팅방을 열 수 없습니다.");
       }
     } finally {
       setOpeningChat(false);
@@ -669,18 +670,26 @@ export default function PostDetail() {
               {openingChat ? "열기 중..." : "채팅하기"}
             </Button>
           ) : (
-            // 비참여자일 때: 참여하기 버튼
-            <Button
-              onClick={handleParticipate}
-              disabled={participating}
-              className="w-full py-6 rounded-xl transition-colors"
-              style={{ 
-                backgroundColor: isDarkMode ? "#4F8BFF" : "#1A2F4A",
-                color: "#ffffff"
-              }}
-            >
-              {participating ? "처리 중..." : "참여하기"}
-            </Button>
+            // 비참여자일 때: 참여하기 버튼 (모집 완료 시 비활성화)
+            (() => {
+              const isRecruitmentComplete = (post.currentQuantity ?? 0) >= (post.minParticipants ?? 2);
+              return (
+                <Button
+                  onClick={handleParticipate}
+                  disabled={participating || isRecruitmentComplete}
+                  className="w-full py-6 rounded-xl transition-colors"
+                  style={{ 
+                    backgroundColor: isRecruitmentComplete 
+                      ? (isDarkMode ? "#6B7280" : "#9CA3AF")
+                      : (isDarkMode ? "#4F8BFF" : "#1A2F4A"),
+                    color: "#ffffff",
+                    cursor: isRecruitmentComplete ? "not-allowed" : "pointer"
+                  }}
+                >
+                  {participating ? "처리 중..." : isRecruitmentComplete ? "인원이 꽉찼습니다!" : "참여하기"}
+                </Button>
+              );
+            })()
           )}
         </div>
       )}

@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { uploadImage } from "../apis/upload";
 import { createPost } from "../apis/posts";
 import { getImageUrl } from "../utils/imageUrl";
+import { toast } from "sonner";
 
 export default function CreatePost() {
   const nav = useNavigate();
@@ -39,7 +40,7 @@ export default function CreatePost() {
     if (!file) return;
 
     if (images.length >= 5) {
-      alert("이미지는 최대 5장까지 업로드할 수 있습니다.");
+      toast.error("이미지는 최대 5장까지 업로드할 수 있습니다.");
       return;
     }
 
@@ -65,7 +66,7 @@ export default function CreatePost() {
       );
     } catch (err) {
       console.error("❌ 이미지 업로드 에러:", err);
-      alert("이미지 업로드 실패");
+      toast.error("이미지 업로드 실패");
       // 업로드 실패 시 해당 이미지 제거
       setImages((prev) => prev.filter((_, i) => i !== tempIndex));
     } finally {
@@ -82,18 +83,18 @@ export default function CreatePost() {
   // 등록하기 ----------------------------
   const handleSubmit = async () => {
     if (images.length === 0) {
-      alert("이미지를 최소 1장 이상 업로드해주세요.");
+      toast.error("이미지를 최소 1장 이상 업로드해주세요.");
       return;
     }
     if (!title || !price || !deadline || !location || !people) {
-      alert("필수 값을 모두 입력해주세요.");
+      toast.error("필수 값을 모두 입력해주세요.");
       return;
     }
 
     // 로그인한 사용자 정보 가져오기
     const userId = localStorage.getItem("userId");
     if (!userId) {
-      alert("로그인이 필요합니다.");
+      toast.error("로그인이 필요합니다.");
       nav("/");
       return;
     }
@@ -127,11 +128,11 @@ export default function CreatePost() {
         category: category || "etc", // 카테고리 추가
       });
 
-      alert("게시글이 등록되었습니다!");
+      toast.success("게시글이 등록되었습니다!");
       nav("/home");
     } catch (err) {
       console.error(err);
-      alert("게시글 등록 실패");
+      toast.error("게시글 등록 실패");
     } finally {
       setLoading(false);
     }

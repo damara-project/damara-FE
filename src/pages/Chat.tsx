@@ -9,6 +9,7 @@ import { getImageUrl } from "../utils/imageUrl";
 import { useTheme } from "../contexts/ThemeContext";
 import { getUserChatRooms, getMessages, sendMessage, markAllMessagesAsRead, getChatRoomById, deleteChatRoom } from "../apis/chat";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface ChatRoom {
   id: string;
@@ -237,9 +238,9 @@ export default function Chat() {
     } catch (err: any) {
       console.error("채팅방 나가기 실패:", err);
       if (err.response?.status === 404) {
-        alert("채팅방을 찾을 수 없습니다.");
+        toast.error("채팅방을 찾을 수 없습니다.");
       } else {
-        alert("채팅방 나가기에 실패했습니다.");
+        toast.error("채팅방 나가기에 실패했습니다.");
       }
     }
   };
